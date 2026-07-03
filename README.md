@@ -1,156 +1,202 @@
-# Contextual AI Assistant
+# ProfilePilot
 
-An enterprise-ready conversational AI assistant with contextual memory, Retrieval-Augmented Generation (RAG), and intelligent workflow orchestration.
+ProfilePilot is a recruiter-facing career assistant for Vishal Singh. It uses Retrieval-Augmented Generation (RAG), conversation memory, source attribution, and optional web search to answer questions about Vishal's profile, skills, projects, experience, hiring preferences, contact details, and professional links.
 
-Built to simulate real-world enterprise conversational AI systems capable of handling contextual conversations, document retrieval, and intelligent response generation.
-
----
-
-# Features
-
-* Context-aware conversational workflows
-* Retrieval-Augmented Generation (RAG)
-* Conversational memory management
-* Intelligent document retrieval
-* REST API-based backend architecture
-* Scalable backend service design
-* Enterprise-oriented modular architecture
-* Session-based conversation handling
-* Vector-based semantic search
-* Extensible workflow orchestration
+The project is built as a full-stack learning project with a Node.js/Express backend, MongoDB-backed vector and chat storage, OpenAI embeddings and chat completions, Tavily web search fallback, and a Next.js frontend.
 
 ---
 
-# Tech Stack
+## Current Status
 
-## Backend
+The project has moved from a generic insurance RAG assistant into a career assistant named ProfilePilot.
 
-* Node.js
-* TypeScript
-* ExpressJS / NestJS
+Implemented:
 
-## AI & RAG
+* Next.js chat UI with authentication, chat history, and source panel
+* Express chat API
+* MongoDB document and session storage
+* Document ingestion from the local `documents/` folder
+* OpenAI embedding generation
+* Cosine-similarity vector retrieval
+* Intent detection and intent-aware reranking
+* Metadata-aware document boosting
+* Query-shape handling for list/detail style retrieval
+* Source expansion for list-style questions
+* Tavily web-search fallback for low-confidence retrieval
+* OpenAI LLM response generation
 
-* OpenAI APIs
-* LangChain
-* Vector Database (ChromaDB / Pinecone)
-* Embedding-based Retrieval
+Still in progress:
 
-## Storage & Infrastructure
-
-* Redis
-* Firebase / MongoDB
-* Docker
-
----
-
-# Architecture Overview
-
-The system is designed using a modular backend architecture consisting of:
-
-1. API Layer
-
-   * Handles client requests and conversational APIs
-
-2. Orchestration Layer
-
-   * Manages conversational workflows and response generation
-
-3. Retrieval Layer
-
-   * Performs semantic search and context retrieval from indexed documents
-
-4. Memory Layer
-
-   * Maintains conversational context and session continuity
-
-5. LLM Integration Layer
-
-   * Generates intelligent responses using large language models
+* Automated tests
+* More robust intent keyword coverage
+* Production deployment setup
+* Broader error handling and observability
 
 ---
 
-# Key Capabilities
+## Architecture
 
-## Conversational Memory
+```text
+Frontend chat UI
+  -> POST /chat/create
+  -> conversation memory lookup
+  -> intent detection
+  -> vector retrieval
+  -> reranking and metadata boosting
+  -> optional source expansion for list queries
+  -> optional Tavily web search
+  -> prompt construction
+  -> OpenAI response
+  -> MongoDB chat history update
+  -> reply + sources returned to frontend
+```
 
-Maintains session-aware conversational context to generate more relevant and coherent responses.
-
-## Retrieval-Augmented Generation (RAG)
-
-Combines semantic document retrieval with LLM-generated responses to improve accuracy and contextual understanding.
-
-## Enterprise Workflow Readiness
-
-Designed with extensibility in mind for enterprise use cases including customer support, internal knowledge systems, and workflow automation.
-
----
-
-# Sample Use Cases
-
-* Enterprise Knowledge Assistant
-* Customer Support Automation
-* Internal Documentation Search
-* Insurance Claims Assistance
-* Workflow Guidance Systems
-* FAQ and Policy Assistance
+The backend ingests local documents at startup, chunks them, creates embeddings, and stores vector records in MongoDB. Chat messages and assistant responses are also persisted in MongoDB so the frontend can show session and conversation history.
 
 ---
 
-# API Endpoints
+## Repository Structure
 
-## Chat Endpoint
+```text
+backend/
+  constants/
+    intentDictionary.js      Intent and query-shape keyword weights
+    maps.js                  Intent-to-document metadata mapping
+    prompts.js               System prompts for career and fallback answers
+  src/
+    app.js                   Express app startup, DB connection, ingestion
+    config/                  Environment, DB, and memory helpers
+    controllers/             Chat request handlers
+    data/                    Local file discovery and document loading
+    database/                MongoDB chat history reads/writes
+    intent/                  Intent scoring and detection
+    retrieval/               Ingestion, vector search, reranking, deduping
+    routing/                 Web-search routing helpers
+    services/                RAG orchestration, LLM, and web search
+    utils/                   Logging, hashing, progress cursor
+
+documents/
+  capabilities/              Skills, projects, experience
+  hiring/                    Availability, compensation, location, role fit
+  personal/                  Contact, education, socials, resume
+  profile/                   Summary and general assistant behavior
+
+frontend/
+  src/app/                   Next.js app router pages and API routes
+  src/components/            Chat UI, auth controls, source panel
+  src/services/              Backend API client
+  src/types/                 Chat and source types
+```
+
+---
+
+## Retrieval Logic
+
+The retrieval flow lives mainly in:
+
+* `backend/src/retrieval/searchSimilarDocs.js`
+* `backend/src/retrieval/rerankDocuments.js`
+* `backend/src/intent/detectIntent.js`
+* `backend/constants/intentDictionary.js`
+* `backend/constants/maps.js`
+
+Current retrieval behavior:
+
+1. Detect the user's domain intent, such as `projects`, `experience`, or `availability`.
+2. Separately detect query shape, such as short/list-style or long/detail-style.
+3. Embed the user query.
+4. Score all embedded document chunks with cosine similarity.
+5. Rerank chunks using semantic score, intent match, and metadata match.
+6. For list-style queries, return all reranked chunks from the mapped source document.
+7. For long/detail queries, return a larger top-K set.
+8. For default/fact queries, return the normal top-K set.
+
+This prevents broad questions like "List all projects Vishal has built" from receiving only the highest-ranking partial chunks.
+
+---
+
+## API Endpoints
+
+### Create Chat Message
 
 ```http
-POST /api/chat
+POST /chat/create
 ```
 
 Request:
 
 ```json
 {
-  "sessionId": "12345",
-  "message": "What is covered under the insurance policy?"
+  "userId": "recruiter@example.com",
+  "sessionId": "session-id",
+  "sessionCreatedAt": 1710000000000,
+  "conversationId": "optional-existing-conversation-id",
+  "message": "List all projects Vishal has built."
 }
 ```
 
----
+Response:
 
-## Document Upload Endpoint
+```json
+{
+  "conversationId": "conversation-id",
+  "reply": "Assistant response",
+  "sources": []
+}
+```
+
+### Fetch Chat History
 
 ```http
-POST /api/documents/upload
+GET /chat/history?userId=recruiter@example.com
 ```
 
-Used for ingesting enterprise documents into the retrieval pipeline.
+### Delete Conversation
+
+```http
+DELETE /chat/:sessionId/:conversationId?userId=recruiter@example.com
+```
 
 ---
 
-# Local Setup
+## Local Setup
 
-## Clone Repository
-
-```bash
-git clone https://github.com/your-username/contextual-ai-assistant.git
-```
-
-## Install Dependencies
+Install backend dependencies:
 
 ```bash
+cd backend
 npm install
 ```
 
-## Configure Environment Variables
-
-Create a `.env` file:
+Create `backend/.env` with the required values:
 
 ```env
-OPENAI_API_KEY=your_api_key
-REDIS_URL=your_redis_url
-VECTOR_DB_URL=your_vector_db_url
+PORT=5000
+MONGO_URI=your_mongodb_uri
+OPENAI_API_KEY=your_openai_api_key
+TAVILY_API_KEY=your_tavily_api_key
 ```
 
-## Start Development Server
+Start the backend:
+
+```bash
+npm run dev
+```
+
+Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env.local` with the backend URL and auth settings used by your NextAuth setup:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000
+```
+
+Start the frontend:
 
 ```bash
 npm run dev
@@ -158,42 +204,18 @@ npm run dev
 
 ---
 
-# Future Enhancements
+## Development Notes
 
-* Multi-agent orchestration
-* Streaming responses
-* Voice integration
-* Authentication & RBAC
-* Advanced observability
-* Workflow analytics dashboard
-* Multi-tenant support
-* Hybrid deterministic + LLM workflows
+* The backend currently ingests documents during server startup.
+* The vector store is implemented in MongoDB, not ChromaDB or Pinecone.
+* `npm test` is not wired yet and currently exits with the default "no test specified" message.
+* The document set is intentionally organized by recruiter question type so metadata-aware retrieval can route questions more reliably.
+* Intent keyword tuning is part of the development loop. If a recruiter phrase routes to `general`, update the dictionary with the phrasing that caused the miss.
 
 ---
 
-# Project Goals
-
-This project is focused on exploring modern enterprise AI system design patterns including:
-
-* Conversational AI
-* RAG architectures
-* AI workflow orchestration
-* Context management
-* Intelligent automation
-* Backend scalability
-
----
-
-# Status
-
-Currently under active development.
-
-Frontend integration, deployment pipelines, and advanced orchestration capabilities are being added incrementally.
-
----
-
-# Author
+## Author
 
 Vishal Singh
 
-Backend Engineer focused on Conversational AI, intelligent automation, and scalable AI-driven systems.
+Backend Engineer focused on conversational AI, RAG systems, intelligent automation, and scalable AI-driven applications.

@@ -35,14 +35,16 @@ export const getUserHistory = async (userId) => {
             const record = conversations.get(message.conversationId);
             record.messages.push({
                 role: message.role,
-                content: message.content
+                content: message.content,
+                sources: message.sources ?? []
             });
         }
 
         for (const [conversationId, conversation] of conversations) {
             const oldestUserMessage = conversation.messages
                 .find((message) => message.role === "user")
-            conversation.title = oldestUserMessage?.content.slice(0, 50);
+            const title = oldestUserMessage?.content ?? "New Chat";
+            conversation.title = title.length > 30 ? `${title.slice(0, 30)}...` : title;
         }
 
         conversationHistory.push({

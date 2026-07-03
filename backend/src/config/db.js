@@ -10,7 +10,7 @@ export const connectDB = async () => {
         await client.connect();
         console.log("MongoDB connected");
 
-        const db = client.db("insurance_rag");
+        const db = client.db("profile_pilot");
         documentsCollection = db.collection("documents");
         sessionsCollection = db.collection("sessions");
 

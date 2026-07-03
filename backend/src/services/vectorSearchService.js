@@ -1,15 +1,3 @@
-/* ####### RAG SERVICE FLOW ####### *\
-message
-   ↓
-retreive docs
-   ↓
-fetch history
-   ↓
-build prompt
-   ↓
-LLM
-\* ################################ */
-
 import { getConversation } from "../config/memory.js";
 import { searchSimilarDocs } from "../retrieval/searchSimilarDocs.js";
 import { getLLMResponse } from "./llmService.js";
@@ -17,6 +5,7 @@ import { searchWeb } from "./webSearchService.js";
 import { fuseSearchResults } from "../retrieval/fuseSearchResults.js";
 import { logger } from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
+import { CAREER_PROMPT, GENERAL_PROMPT } from "../../constants/prompts.js";
 
 /**
  * Service to perform RAG operations (search doc, retreive history, call LLM service)
@@ -206,7 +195,7 @@ const buildPrompt = (useVector, useWeb, history, message, vectorResults, webResu
     if (!useVector && !useWeb) {
         prompt.push({
             role: "system",
-            content: "You are a helpful and friendly AI assistant."
+            content: GENERAL_PROMPT
         });
 
         if (pastContext.length) {
@@ -226,13 +215,8 @@ const buildPrompt = (useVector, useWeb, history, message, vectorResults, webResu
     prompt.push({
         role: "system",
         content: `
-            You are a helpful insurance assistant.
-
-            Use the provided context whenever relevant.
-
-            If the context contains the answer, prioritize it.
-            Otherwise, respond conversationally and naturally.
-
+            ${CAREER_PROMPT}
+            
             Context:
                 ${context}
         `

@@ -1,0 +1,64 @@
+Role Fit
+
+Purpose:
+Use this document when recruiters, hiring managers, or interviewers ask whether Vishal is suitable for a particular role, project, or team.
+
+Career Positioning:
+Vishal is an experienced software engineer and conversational AI professional with 8+ years of experience delivering enterprise solutions across insurance, healthcare, hospitality, finance, social welfare, and e-commerce domains.
+His recent focus has shifted toward Generative AI, Retrieval-Augmented Generation (RAG), Agentic AI, backend architecture, system integrations, and solution design.
+
+Primary Target Roles:
+
+- AI Engineer
+- Generative AI Engineer
+- RAG Engineer
+- Applied AI Engineer
+- Conversational AI Engineer
+- Conversational AI Architect
+- AI Solutions Engineer
+- Senior Software Engineer
+- Technical Lead
+
+Strongest Areas:
+
+- Retrieval-Augmented Generation (RAG)
+- Conversational AI and Voice Agents
+- Enterprise System Integrations
+- Solution Architecture
+- Backend Development
+- API Design and Integration
+- Agentic Workflows
+- Prompt Engineering
+- Production AI Systems
+- Cross-functional Technical Leadership
+
+Good Match For:
+
+Vishal is a strong fit for teams building AI-powered products, enterprise automation platforms, customer support solutions, internal copilots, virtual assistants, workflow automation systems, knowledge management platforms, and backend-heavy applications.
+He performs particularly well in roles requiring both engineering execution and high-level solution design.
+
+Partial Match / Can Ramp Up Quickly:
+
+- Foward Deployed Engineer
+- AI Platform Engineer
+- Cloud-focused AI Engineer
+- AI Product Engineer
+
+While his strongest experience is in application-layer AI and enterprise systems, he can ramp up quickly in adjacent areas when required.
+
+Not Actively Targeting
+
+- Full Stack Engineer
+- Machine Learning Engineer
+- Pure Backend Development Roles
+- Pure Frontend Development Roles
+- Data Scientist Roles
+- Research Scientist Roles
+- Academic ML Positions
+- MLOps-only Roles
+
+Interview Recommendation
+
+Vishal should be evaluated not only on coding ability but also on his experience designing and delivering production systems used by enterprise clients.
+His combination of backend engineering, conversational AI expertise, enterprise integration experience, and growing specialization in Generative AI makes him particularly valuable for organizations looking for engineers who can bridge business requirements, architecture, and implementation.
+When assessing role fit, prioritize demonstrated project delivery, system design capability, stakeholder communication, and end-to-end ownership alongside technical depth.

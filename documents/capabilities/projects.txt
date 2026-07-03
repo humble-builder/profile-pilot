@@ -1,0 +1,52 @@
+Projects
+
+Purpose:
+Use this document to answer recruiter questions about Vishal's projects, architecture decisions, implementation details, and project impact.
+
+Project List:
+- Hybrid RAG Career Assistant
+- Insurance Conversational AI Solutions
+- Healthcare Virtual Assistant
+- Hospitality and Booking Automation
+- E-Commerce Customer Support Assistant
+
+
+Personal or private projects:
+- Hybrid RAG Career Assistant (ProfilePilot)
+    * Problem solved: Recruiters and hiring managers often need quick access to a candidate’s experience, projects, and technical expertise without manually reviewing resumes and documents.
+    * Tech stack: Node.js, Express.js, MongoDB, OpenAI Embeddings, OpenAI GPT Models, LangChain, Tavily Search, Next.js, TypeScript
+    * Architecture: User Query → Intent Detection → Vector Search → Hybrid Retrieval (Knowledge Base + Web Search) → Reranking → Semantic Deduplication → LLM Response Generation → Conversation Memory → Source Attribution
+    * Your contribution: Designed and built the solution end-to-end. Implemented document ingestion, embedding generation, vector search, semantic retrieval, reranking, conversation memory, web-search fallback, source attribution, and frontend chat experience.
+    * Impact: Demonstrated practical implementation of modern RAG architecture, retrieval optimization, and conversational AI engineering concepts while creating a recruiter-facing AI assistant.
+
+Company or work projects:
+- Insurance Conversational AI Solutions
+    * Problem solved: Insurance customers required self-service access for policy information, premium inquiries, payments, beneficiary management, and policy servicing, resulting in high contact-center workload.
+    * Tech stack: Amelia, Conversational AI Platforms, REST APIs, Mulesoft, CRM Integrations, Voice and Chat Channels
+    * Architecture: Customer → Conversational AI Assistant → Authentication Layer → Business Workflows → Enterprise APIs → Insurance Backend Systems → Response Generation
+    * Your contribution: Designed and enhanced conversational workflows for authentication, policy servicing, premium information, payment-related requests, beneficiary inquiries, and customer support interactions. Collaborated with business and integration teams to deliver enterprise-grade solutions.
+    * Impact: Improved customer self-service capabilities, reduced dependency on support agents, and strengthened experience in large-scale insurance automation projects.
+- Healthcare Virtual Assistant
+    * Problem solved: Patients required faster access to healthcare information, appointment-related services, and support without relying entirely on contact-center staff.
+    * Tech stack: Conversational AI Platform, REST APIs, Healthcare Integrations, Voice and Chat Channels
+    * Architecture: Patient → Virtual Assistant → Intent Recognition → Healthcare Services & Backend Systems → Response Generation → Escalation Pathways
+    * Your contribution: Designed conversational journeys, integrated backend healthcare services, implemented escalation handling strategies, and optimized patient support experiences.
+    * Impact: Improved accessibility of healthcare services while reducing operational effort for support teams and improving patient engagement.
+- Hospitality and Booking Automation
+    * Problem solved: Customers required a streamlined way to make reservations, manage bookings, and access hospitality services without manual intervention.
+    * Tech stack: Conversational AI Platform, Reservation APIs, CRM Systems, REST Integrations
+    * Architecture: Customer → Booking Assistant → Availability Validation → Reservation Management System → Confirmation & Notifications
+    * Your contribution: Designed booking workflows, integrated reservation systems, implemented scheduling logic, and supported customer engagement use cases.
+    * Impact: Simplified reservation management, improved customer experience, and reduced manual workload for hospitality operations teams.
+- E-Commerce Customer Support Assistant
+    * Problem solved: Growing customer support demand for order tracking, service requests, and product-related inquiries increased pressure on support teams.
+    * Tech stack: Conversational AI Platform, ServiceNow, CRM Systems, REST APIs
+    * Architecture: Customer → Virtual Assistant → Authentication & Intent Detection → Enterprise Systems → Order & Service Management → Response Generation
+    * Your contribution: Implemented conversational workflows, integrated enterprise systems, enabled order tracking capabilities, and improved customer support automation.
+    * Impact: Increased self-service adoption and reduced support workload by automating common customer interactions.
+- Enterprise Backend Engineering Solutions
+    * Problem solved: Enterprise applications required scalable backend services, system integrations, workflow automation, and production support to support business operations.
+    * Tech stack: Node.js, JavaScript, REST APIs, Databases, Enterprise Integration Platforms
+    * Architecture: Client Applications → Backend Services → Business Logic Layer → Databases & Enterprise Systems
+    * Your contribution: Developed backend services, APIs, automation workflows, integration solutions, and production support processes. Contributed to performance optimization and operational stability initiatives.
+    * Impact: Built strong expertise in backend engineering, system integration, troubleshooting, and enterprise application development.

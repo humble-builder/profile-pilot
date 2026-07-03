@@ -12,13 +12,14 @@ export const readConversation = async (userId) => {
     return await getUserHistory(userId);
 };
 
-export const addMessage = async (metadata, role, content) => {
+export const addMessage = async (metadata, role, content, sources = []) => {
     const currentTimestamp = Date.now();
     const currentMessage = {
         role,
         content,
         messageId: uuidv4(),
-        createdAt: currentTimestamp
+        createdAt: currentTimestamp,
+        sources: [...(sources.length ? sources : [])]
     };
 
     const currentConversation = await getConversation(metadata);

@@ -11,25 +11,34 @@ export const detectIntent = (query) => {
     logger.info(`User query received: ${query.substring(0, 100)}...`);
     logger.info("Starting intent detection...");
 
-    const detectedIntents = [];
+    const domainIntents = [];
+    const shapeIntents = [];
     const intentScores = scoreIntent(query);
     logger.info("Scoring complete. Listing detected intents...")
 
     for (const [intent, score] of Object.entries(intentScores)) {
         const confidence = score > 0 ? Number((score / intentMaxScores[intent]).toFixed(3)) : 0;
         if (confidence > 0) {
-            detectedIntents.push({ intent, confidence: confidence });
+            if (["list_query", "explain_query"].includes(intent)) {
+                shapeIntents.push({ intent, confidence: confidence });
+            }
+            else {
+                domainIntents.push({ intent, confidence: confidence });
+            }
             logger.info(`[Intent Match] "${intent}" | Score = ${score} | Confidence = ${confidence})`);
         }
     }
 
-    const sortedIntents = detectedIntents.toSorted((a, b) => b.confidence - a.confidence);
+    const sortedIntents = domainIntents.toSorted((a, b) => b.confidence - a.confidence);
     const topIntent = sortedIntents.length > 0 && sortedIntents[0].confidence > 0 ? sortedIntents[0].intent : "general";
     
     logger.info(`Predicted intent: ${topIntent}`);
 
     return {
         predictedIntent: topIntent,
-        detectedIntents: sortedIntents,
+        detectedIntents: {
+            domainIntents,
+            shapeIntents
+        },
     };
 };

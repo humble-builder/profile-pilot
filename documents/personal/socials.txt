@@ -1,0 +1,28 @@
+Socials
+
+Purpose:
+Use this document to answer questions about Vishal's professional and coding profiles.
+
+LinkedIn:
+https://www.linkedin.com/in/vishal-singh-834986199/
+
+GitHub:
+https://github.com/humble-builder
+
+LeetCode:
+https://leetcode.com/u/humble_leetcoder/
+
+Naukri:
+Available on Naukri under Vishal Singh's profile. Recruiters can search using Vishal's official email.
+
+Portfolio:
+Say that Vishal does not have a Portfolio, but he is actively working towards building one.
+
+Resume or CV:
+Latest resume PDF file: Vishal_Singh_Conversational_AI_Resume.pdf
+When asked for the resume, share this file name as the available resume PDF.
+Do not create placeholder links.
+
+Sharing guidance:
+Share only the links that are present in this document.
+If a link is missing, say that Vishal does not have a link to that profile yet.

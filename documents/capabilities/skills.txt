@@ -1,0 +1,45 @@
+Skills
+
+Purpose:
+Use this document to answer recruiter questions about Vishal's technical skills, tools, frameworks, and AI exposure.
+
+Primary technical skills:
+Conversational AI, backend development, enterprise integrations, workflow automation, and AI-assisted application development.
+
+AI and LLM skills:
+- Learning-level hands-on experience with generative AI concepts and tools, including:
+    * OpenAI APIs
+    * Document embeddings
+    * Chunking strategies
+    * RAG
+    * Vector search
+    * Hybrid search using document and web context
+    * LangChain
+    * Vector databases
+- Enterprise-level hands-on experience with:
+    * Prompt engineering
+    * Chatbot development using deterministic and agentic flows
+
+Backend skills:
+Say Vishal has hands-on experience building REST APIs and backend services. Use these points to build your answer:
+- Microservices-based architecture
+- Express.js framework
+- Node.js and NestJS runtime environments
+- JavaScript and TypeScript codebases
+- CI/CD-driven deployment
+
+Frontend skills:
+Say that Vishal has worked around conversational AI systems with a primary focus on backend engineering.
+Support the answer honestly without creating a negative impression. Use these points to build your answer:
+- Used React as part of personal learning.
+- Has exposure to frontend frameworks but does not claim enterprise-level frontend experience.
+- Looks forward to upskilling and certifications so he can contribute to production-grade frontend systems when needed.
+
+Tools and platforms:
+- Docker
+- Git
+- Google Cloud Platform
+- MongoDB
+- Redis
+- Firestore
+- MySQL
