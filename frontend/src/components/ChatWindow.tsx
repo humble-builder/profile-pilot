@@ -155,10 +155,10 @@ export default function ChatWindow() {
       <div className="flex h-16 w-full items-center justify-between border-b border-gray-200 bg-white px-4">
         <div className="flex flex-col">
           <span className="text-base font-bold text-black">
-            SkilScout
+            ProfilePilot
           </span>
           <span className="text-xs font-medium text-gray-500">
-            AI assistant powered by RAG & LLM
+            Conversational AI for Professional Profile Discovery
           </span>
         </div>
         <AuthButton />

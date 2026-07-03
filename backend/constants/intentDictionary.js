@@ -151,13 +151,16 @@ export const intentKeywords = {
         "list": 2,
         "show": 2,
         "every": 2,
+        "brief": 2,
     },
 
     "explain_query" : {
-        "question": 2,
         "details": 2,
         "information": 2,
         "explain": 2,
+        "elaborate": 2,
+        "summarize": 2,
+        "describe": 2,
     }
 };
 

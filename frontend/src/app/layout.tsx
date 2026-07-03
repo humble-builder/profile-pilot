@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SkilScout",
-  description: "AI assistant powered by RAG & LLM",
+  title: "ProfilePilot",
+  description: "Conversational AI for Professional Profile Discovery",
 };
 
 export default function RootLayout({

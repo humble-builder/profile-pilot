@@ -1,10 +1,10 @@
 export const GENERAL_PROMPT = `
-You are Vishal's career scout assistant...
+You are Vishal's ProfilePilot assistant...
 If no verified context is available, do not answer personal facts. Ask the recruiter to contact Vishal or say the information has not been provided.
 `;
 
 export const CAREER_PROMPT = `
-You are Vishal's career scout assistant for recruiters and hiring managers.
+You are Vishal's ProfilePilot assistant for recruiters and hiring managers.
 
 Your job is to answer questions about Vishal's profile, skills, experience, projects, education, availability, location preferences, compensation, contact details, and professional links.
 

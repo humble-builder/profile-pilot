@@ -1,5 +1,5 @@
 export const GREETING_MESSAGE = `
-### Hi, I'm *SkilScout*, Vishal Singh's career assistant.
+### Hi, I'm *ProfilePilot*, Vishal Singh's career assistant.
 
 #### You can ask me about
 

@@ -4,15 +4,15 @@ Purpose:
 Use this document to answer recruiter questions about Vishal's projects, architecture decisions, implementation details, and project impact.
 
 Project List:
-- Hybrid RAG Career Assistant (2 projects)
-- Insurance Conversational AI Solutions (2 project)
-- Healthcare Virtual Assistant (1 projects)
-- Hospitality and Booking Automation (2 projects)
-- E-Commerce Customer Support Assistant (2 projects)
+- Hybrid RAG Career Assistant
+- Insurance Conversational AI Solutions
+- Healthcare Virtual Assistant
+- Hospitality and Booking Automation
+- E-Commerce Customer Support Assistant
 
 
 Personal or private projects:
-- Hybrid RAG Career Assistant (SkillScout)
+- Hybrid RAG Career Assistant (ProfilePilot)
     * Problem solved: Recruiters and hiring managers often need quick access to a candidate’s experience, projects, and technical expertise without manually reviewing resumes and documents.
     * Tech stack: Node.js, Express.js, MongoDB, OpenAI Embeddings, OpenAI GPT Models, LangChain, Tavily Search, Next.js, TypeScript
     * Architecture: User Query → Intent Detection → Vector Search → Hybrid Retrieval (Knowledge Base + Web Search) → Reranking → Semantic Deduplication → LLM Response Generation → Conversation Memory → Source Attribution

@@ -1,6 +1,6 @@
-# SkilScout
+# ProfilePilot
 
-SkilScout is a recruiter-facing career assistant for Vishal Singh. It uses Retrieval-Augmented Generation (RAG), conversation memory, source attribution, and optional web search to answer questions about Vishal's profile, skills, projects, experience, hiring preferences, contact details, and professional links.
+ProfilePilot is a recruiter-facing career assistant for Vishal Singh. It uses Retrieval-Augmented Generation (RAG), conversation memory, source attribution, and optional web search to answer questions about Vishal's profile, skills, projects, experience, hiring preferences, contact details, and professional links.
 
 The project is built as a full-stack learning project with a Node.js/Express backend, MongoDB-backed vector and chat storage, OpenAI embeddings and chat completions, Tavily web search fallback, and a Next.js frontend.
 
@@ -8,7 +8,7 @@ The project is built as a full-stack learning project with a Node.js/Express bac
 
 ## Current Status
 
-The project has moved from a generic insurance RAG assistant into a career assistant named SkilScout.
+The project has moved from a generic insurance RAG assistant into a career assistant named ProfilePilot.
 
 Implemented:
 
@@ -28,7 +28,6 @@ Implemented:
 Still in progress:
 
 * Automated tests
-* Cleaner query-shape naming, for example `list_query` instead of `short_query`
 * More robust intent keyword coverage
 * Production deployment setup
 * Broader error handling and observability
