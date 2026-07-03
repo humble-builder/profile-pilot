@@ -1,16 +1,17 @@
 import mammoth from 'mammoth';
-import * as pdf from 'pdf-parse';
+import { PDFParse } from "pdf-parse";
 import path from 'path';
 import fs from 'fs';
-
-const parsePdf = pdf.default || pdf; // Handle both CommonJS and ES Module exports
 
 export const loadDocument = async (filePath) => {
     const ext = path.extname(filePath).toLowerCase();
     
     if (ext === '.pdf') {
         const dataBuffer = fs.readFileSync(filePath);
-        const pdfData = await parsePdf(dataBuffer);
+        const pdfParser = new PDFParse({data: dataBuffer});
+        const pdfData = await pdfParser.getText();
+        await pdfParser.destroy();
+        
         return [{
             pageContent: pdfData.text, 
             metadata: {

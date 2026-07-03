@@ -1,0 +1,21 @@
+Education
+
+Purpose:
+Use this document to answer recruiter questions about Vishal's education, qualifications, certifications, and learning background.
+
+Degree:
+Vishal has pursed BTech in Computer Science Engineering
+
+Institution:
+Vishal's college name is Bengal of Institute of Technology
+It is affiliated to the board under Maulana Abul Kalam Azad University of Technology,
+
+Dates:
+Vishal's degree started year in the year 2013. He graduated in 2017
+
+Certifications or Relevant coursework:
+Say that Vishal has not provided or uploaded any certifications yet.
+And also mention that Vishal has registered for few online courses, and those are currently in progress.
+
+Self-learning:
+Vishal has built RAG-based conversational assistants using Node.js, MongoDB, Redis, OpenAI APIs, LLMs, embeddings, and retrieval pipelines.

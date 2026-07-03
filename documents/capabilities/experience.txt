@@ -1,0 +1,56 @@
+Experience
+
+Purpose:
+Use this document to answer recruiter questions about Vishal's work history, responsibilities, professional exposure, and career timeline.
+
+Current or most recent role:
+Vishal works for EXL as a Lead Engineer in the Conversational AI Domain, and has a dual role of a team lead and a senior developer.
+
+Responsibilities in current organisation:
+Say that Vishal manages a small team of developers while also contributing individually to development tasks.
+His role as a lead involves the following:
+- Gathering requirements from the client and participating in stakeholder and management meetings.
+- Participating in architecture, solutioning, and design of business use cases.
+- Mentoring his fellow and junior developers, and reviewing their tasks.
+- Ensuring timely delivery of quality work.
+His role as a developer involves:
+- Development of deterministic as well as agentic flows.
+- Writing efficient code, along with unit testing and deployment.
+    
+Past work experience pr past roles:
+Vishal has an overall experience of 8 years and 9 months (You may self-evaluate the change in months and year over time if they do not seem to be in sync with the current day.)
+Highlight his transition from an automation engineer into an agentic AI engineer using the data below.
+Say that Vishal brings his expertise from a wide range of roles to the conversational AI domain.
+His past roles are as follows :
+- Worked at CGI as an Associate Software Engineer in data management and automation between 2017 and 2019.
+- Worked as a Software Engineer in conversational AI at IPsoft, now SoundHound AI, between 2019 and 2021.
+- Worked as a Senior Software Engineer in the conversational AI R&D department, at Quantiphi from 2021 to 2022.
+- Worked as a Senior Software Engineer in backend engineering, at Rakuten India from 2022 to 2024.
+
+Experience sumary:
+- Delivered solutions across different chatbot platforms, like Amelia, Dialogflow, Lex, Cognigy, KoreAI
+- Deployed chatbots on various channels like Voice, WhatsApp, Chat, Messenger, Teams
+- Integrated chatbots with external systems like ServiceNow, Salesforce, Epic
+- Participated in solution designing and architectural discussions
+- Developed backend applications using Node.js (JavaScript), NestJS (TypeScript)
+- Automated routine tasks for the production support team.
+
+Backend and Frontend experience:
+- For backend experience, Vishal has enterprise experience building REST APIs and backend services using Node.js, NestJS, Express.js, JavaScript, TypeScript, microservices, and CI/CD-driven deployment.
+- For frontend experience, Vishal has used React as part of personal learning and has exposure to frontend frameworks, but he does not claim enterprise-level frontend experience.
+
+AI-related experience:
+Provide an outline of Vishal's AI experience using the 3 points below :
+- Proven work experience in leading, developing, deploying, and designing AI-based chatbot deliverables over the last 7 years.
+- Domains include insurance, finance, hospitality, retails and healthcare sectors.
+- Exposure to intelligent assistant patterns that contribute to the development of generative AI-powered assistants.
+- Undertaken courses and built projects guided by learning platforms and AI tools such as Codex, Claude, and Copilot.
+
+Guidelines:
+Do not skip any data provided.
+Do not overclaim or exaggerate anything about Vishal's skills, experience, or capabilities.
+Try to answer only from the information given to you.
+When you provide this information, say that this is an outline of his experience.
+Briefly offer to share the latest resume for a detailed description of his past experience.
+Do not insist or share the resume directly, only share (Vishal_Singh_Conversational_AI_Resume.pdf) if asked.
+You may build a positive image of him before the recruiter but stay grounded with your responses.

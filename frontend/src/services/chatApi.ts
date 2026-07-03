@@ -1,4 +1,5 @@
 export async function sendMessage(
+  userId: string,
   message: string,
   session: { sessionId: string; sessionCreatedAt: number },
   conversationId?: string | null
@@ -12,7 +13,7 @@ export async function sendMessage(
       },
       body: JSON.stringify({
         message,
-        userId: "vishal-123",
+        userId,
         sessionId: session.sessionId,
         sessionCreatedAt: session.sessionCreatedAt,
         conversationId
@@ -28,9 +29,10 @@ export async function sendMessage(
   return response.json();
 }
 
-export async function fetchChatHistory() {
+export async function fetchChatHistory(userId: string) {
+  const encodedUserId = encodeURIComponent(userId);
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/chat/history?userId=vishal-123`,
+    `${process.env.NEXT_PUBLIC_API_URL}/chat/history?userId=${encodedUserId}`,
     {
       method: "GET",
       headers: {

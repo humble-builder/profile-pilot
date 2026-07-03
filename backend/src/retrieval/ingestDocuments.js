@@ -53,6 +53,7 @@ for (const filePath of filePaths) { // Read each document, split it into chunks
 export const ingestDocuments = async () => {
     const cursorInterval = startCursor("Ingesting documents...");
     try {
+        await documentsCollection.deleteMany({ "metadata.sourceType": "vector" });
         /**
          * Generate embeddings for document chunks in batches
          * to optimize API calls and handle large datasets efficiently

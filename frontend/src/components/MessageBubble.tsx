@@ -1,4 +1,6 @@
 import { Message } from "@/types/chat";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Props {
   message: Message;
@@ -21,10 +23,22 @@ export default function MessageBubble({
         className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-md ${
           isUser
             ? "bg-blue-500 text-white"
-            : "bg-white text-grey-800"
+            : "bg-white text-gray-800"
         }`}
       >
-        {message.content}
+        <div className="space-y-2 text-sm leading-relaxed 
+[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 
+[&_a]:text-blue-600 [&_a]:underline [&_strong]:font-semibold
+[&_h1]:text-xl [&_h1]:font-bold
+[&_h2]:text-lg [&_h2]:font-semibold
+[&_h3]:text-base [&_h3]:font-semibold
+[&_h4]:text-medium [&_h4]:font-semibold
+[&_blockquote]:border-l-4 [&_blockquote]:border-gray-300
+[&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
+        </div>
         {!isUser && message.sources?.length ? (
           <button
             type="button"

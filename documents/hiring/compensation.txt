@@ -1,0 +1,21 @@
+Compensation
+
+Purpose:
+Use this document to answer compensation questions using only Vishal's latest stated compensation profile.
+
+Current compensation:
+35 LPA with a fixed component of 31.50 LPA and variable or bonus payout of 3.50 LPA
+3500000
+
+Expected compensation:
+45 LPA.
+
+Negotiation guidance:
+Vishal is expecting a minimum fixed component of 40 LPA.
+Any variable on top of that is the company's decision and would a part of the overall CTC.
+
+Payslips:
+If requested for payslips, share them as a downloadable zip. Look for the file names starting with "Payslip".
+
+Fallback response:
+If compensation data is missing, the assistant should say Vishal has not provided a public compensation preference yet and the recruiter can discuss it directly during the hiring process.

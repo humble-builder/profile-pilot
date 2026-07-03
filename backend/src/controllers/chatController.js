@@ -1,13 +1,3 @@
-/* ####### CONTROLLER FLOW ####### *\
-Controller
-   ↓
-Chat Service
-   ↓
-RAG Service
-   ↓
-LLM Service 
-\* ################################ */
-
 import { getAnswer } from "../services/vectorSearchService.js";
 import { addMessage } from "../config/memory.js";
 import {
@@ -51,7 +41,7 @@ export const createChat = async (req, res) => {
         const response = await getAnswer(query);
 
         await addMessage(query, "user", req.body.message);
-        await addMessage(query, "assistant", response.reply);
+        await addMessage(query, "assistant", response.reply, response.sources);
 
         return res.json({
             conversationId,

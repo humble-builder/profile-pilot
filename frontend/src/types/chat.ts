@@ -26,7 +26,7 @@ export interface Message {
 export interface ConversationHistoryItem {
   conversationId: string;
   title: string;
-  messages: Array<Pick<Message, "role" | "content">>;
+  messages: Array<Pick<Message, "role" | "content" | "sources">>;
 }
 
 export interface SessionHistoryItem {
