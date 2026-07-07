@@ -46,7 +46,7 @@ export const fuseSearchResults = ({
         .toSorted((a, b) => b.finalScore - a.finalScore)
         .slice(0, 8);
 
-    if (process.env.DEBUG_FUSION === "true") logger.info("Top fused results:\n",topKFusedResults);
+    logger.info("DEBUG_FUSION", "Top fused results:\n", topKFusedResults);
 
     return topKFusedResults;
 };

@@ -25,41 +25,41 @@ export const getAnswer = async (query) => {
     // Retreive conversation history for the user to provide context to the LLM
     const conversation = await getConversation(query);
     let history = [];
-    
+
     if (conversation.length) {
         history = conversation.map((message) => ({
             role: message.role,
             content: message.content
         })).slice(-6);
     }
-    
-    /** 
+
+    /**
      * Get the top K documents relevant to user query
      * Fallback to web search for better results
      * Fallback to generic LLM response if search fails
      */
-    
+
     retreivedDocs.push(...await searchSimilarDocs(message)); // default vector search with cosine similarity
     const topScore = retreivedDocs.length > 0 ? retreivedDocs[0].score : 0;
-    logger.info("Top retrieval score: ", topScore);
+    logger.info("DEBUG_RETRIEVAL", "Top retrieval score: ", topScore);
 
     const shouldUseWebSearch = topScore < 0.50; // use web search if document relevance is low
     const shouldUseHybridSearch = topScore >= 0.50 && topScore < 0.85; // Optional: use web search alongside RAG for mid-range scores
 
     const shouldRetrieveWeb = shouldUseWebSearch || shouldUseHybridSearch; // if we're doing hybrid or web-only search, we want to include web results in context
     const shouldRetrieveVector = !shouldUseWebSearch; // if we're doing hybrid or vector-only, we want to include vector results in context
-    
+
     if (shouldRetrieveWeb) {
-        logger.info(`Document retrieval confidence is ${shouldUseWebSearch ? "low" : "average"}.`);
+        logger.info("DEBUG_RETRIEVAL", `Document retrieval confidence is ${shouldUseWebSearch ? "low" : "average"}.`);
         webSearchResults.push(...await searchWeb(message)); // call web search service
     }
 
     const webSearchFailed = shouldRetrieveWeb && webSearchResults.length === 0;
     const webSearchLowConfidence = !webSearchFailed && webSearchResults.every(result => result.score < 0.5);
-    
+
     // If web and vector search fail to provide relevant results, fallback to direct LLM response without context
     if (shouldUseWebSearch && (webSearchFailed || webSearchLowConfidence)) {
-        logger.info("Web search yielded no results.");
+        logger.info("DEBUG_RETRIEVAL", "Web search yielded no results.");
 
         prompt = buildPrompt(false, false, history, message, [], []); // build prompt without any context
         const fallbackReply = await getLLMResponse(prompt);
@@ -73,29 +73,27 @@ export const getAnswer = async (query) => {
      */
 
     if (shouldRetrieveWeb && shouldRetrieveVector) {
-        logger.info("Fusing document retrieval and web search results.");
+        logger.info("DEBUG_RETRIEVAL", "Fusing document retrieval and web search results.");
         fusedResults.push(...fuseSearchResults({
             vectorResults: retreivedDocs,
             webResults: webSearchResults
         }));
-        logger.info("Top fused result score: ", fusedResults[0]?.finalScore);
+        logger.info("DEBUG_RETRIEVAL", "Top fused result score: ", fusedResults[0]?.finalScore);
 
         // For hybrid approach, include fused results in the prompt
         prompt = buildPrompt(true,true,history,message,[],[],fusedResults);
     }
 
-    if (process.env.DEBUG_THRESHOLD === "true") {
-        logger.info(`Debug logs for threshold tuning:\n
+    logger.info("DEBUG_THRESHOLD", `Debug logs for threshold tuning:\n
         [use web search] = ${shouldUseWebSearch}
         [use hybrid search] = ${shouldUseHybridSearch}
         [original top vector score] = ${topScore}
         [fused top score] = ${fusedResults[0]?.finalScore}
         `);
-    }
 
     // If only vector results are relevant, include retreived documents in the prompt
     if (!shouldRetrieveWeb && shouldRetrieveVector) {
-        logger.info("High document retrieval confidence.")
+        logger.info("DEBUG_RETRIEVAL", "High document retrieval confidence.")
         prompt = buildPrompt(true,false,history,message,retreivedDocs);
     }
 
@@ -148,7 +146,7 @@ export const getAnswer = async (query) => {
                 };
                 groupSources.set(key, newSourceObject);
             }
-            
+
             else groupSources.get(key).chunks.push(chunkScore);
         }
         else if (item.sourceType === "web") {
@@ -186,12 +184,12 @@ export const getAnswer = async (query) => {
  */
 
 const buildPrompt = (useVector, useWeb, history, message, vectorResults, webResults, fusedResults) => {
-    
+
     const pastContext = history.length
         ? history.map((item) => ({role: item.role, content: item.content}))
         : [];
     const prompt = [];
-    
+
     if (!useVector && !useWeb) {
         prompt.push({
             role: "system",
@@ -216,7 +214,7 @@ const buildPrompt = (useVector, useWeb, history, message, vectorResults, webResu
         role: "system",
         content: `
             ${CAREER_PROMPT}
-            
+
             Context:
                 ${context}
         `

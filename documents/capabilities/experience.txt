@@ -16,8 +16,8 @@ His role as a lead involves the following:
 His role as a developer involves:
 - Development of deterministic as well as agentic flows.
 - Writing efficient code, along with unit testing and deployment.
-    
-Past work experience pr past roles:
+
+Past work experience or past roles:
 Vishal has an overall experience of 8 years and 9 months (You may self-evaluate the change in months and year over time if they do not seem to be in sync with the current day.)
 Highlight his transition from an automation engineer into an agentic AI engineer using the data below.
 Say that Vishal brings his expertise from a wide range of roles to the conversational AI domain.

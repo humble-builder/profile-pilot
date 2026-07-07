@@ -20,7 +20,7 @@ Implemented:
 * Cosine-similarity vector retrieval
 * Intent detection and intent-aware reranking
 * Metadata-aware document boosting
-* Query-shape handling for list/detail style retrieval
+* Query-shape handling for list/detail/default fact-style retrieval
 * Source expansion for list-style questions
 * Tavily web-search fallback for low-confidence retrieval
 * OpenAI LLM response generation
@@ -43,7 +43,7 @@ Frontend chat UI
   -> intent detection
   -> vector retrieval
   -> reranking and metadata boosting
-  -> optional source expansion for list queries
+  -> optional source expansion for list-style queries
   -> optional Tavily web search
   -> prompt construction
   -> OpenAI response
@@ -103,13 +103,13 @@ The retrieval flow lives mainly in:
 Current retrieval behavior:
 
 1. Detect the user's domain intent, such as `projects`, `experience`, or `availability`.
-2. Separately detect query shape, such as short/list-style or long/detail-style.
+2. Separately detect query shape, such as list-style, detail-style, or default fact-style.
 3. Embed the user query.
 4. Score all embedded document chunks with cosine similarity.
 5. Rerank chunks using semantic score, intent match, and metadata match.
 6. For list-style queries, return all reranked chunks from the mapped source document.
-7. For long/detail queries, return a larger top-K set.
-8. For default/fact queries, return the normal top-K set.
+7. For detail-style queries, return a larger top-K set.
+8. For default fact-style queries, return the normal top-K set.
 
 This prevents broad questions like "List all projects Vishal has built" from receiving only the highest-ranking partial chunks.
 

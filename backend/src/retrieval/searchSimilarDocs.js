@@ -34,8 +34,8 @@ export const searchSimilarDocs = async (query) => {
     if (queryIntent.detectedIntents.shapeIntents.length > 0) {
         const mappedIntentMetadata = intentToDocumentMap[queryIntent.predictedIntent];
         const queryShapes = queryIntent.detectedIntents.shapeIntents.toSorted((a, b) => b.confidence - a.confidence);
-        if (queryShapes[0].intent === "explain_query") {
-            k = 10; // Return top 10 relevant documents for explain queries
+        if (queryShapes[0].intent === "detail_query") {
+            k = 10; // Return top 10 relevant documents for detail queries
         }
         else {
             if (!mappedIntentMetadata) return [];
