@@ -48,3 +48,23 @@ export async function fetchChatHistory(userId: string) {
 
   return response.json();
 }
+
+export async function deleteChatHistory(userId:string, sessionId: string, conversationId: string) {
+  const encodedUserId = encodeURIComponent(userId);
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/chat/${sessionId}/${conversationId}?userId=${encodedUserId}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText);
+  }
+
+  return response.json();
+}

@@ -23,7 +23,7 @@ export const rerankDocuments = (retreivedDocs, queryIntent) => {
             const metadataBoost = needMetadataBoost ? 0.2 : 0; // Boost score by 20% if metadata matches
             adjustedScore += metadataBoost;
         }
-        
+
         return {
             ...doc,
             intentScore,
@@ -33,16 +33,14 @@ export const rerankDocuments = (retreivedDocs, queryIntent) => {
     });
 
     const sortedDocs = rerankedDocs.toSorted((a, b) => b.score - a.score); // Sort documents by adjusted score in descending order
-    if (process.env.DEBUG_RERANK === "true") {
-        logger.info(`Top reranked documents after intent adjustment for ${queryIntent.predictedIntent}:`, 
-            sortedDocs.slice(0, 3).map(doc => ({
-                intentScore: doc.intentScore.toFixed(2),
-                semanticScore: doc.semanticScore.toFixed(2),
-                totalScore: doc.score.toFixed(2),
-                contentSnippet: doc.content.substring(0, 100) + '...' // Show a snippet of the content
-            }))
-        );
-    }
+    logger.info("DEBUG_RERANK", `Top reranked documents after intent adjustment for ${queryIntent.predictedIntent}:`,
+        sortedDocs.slice(0, 3).map(doc => ({
+            intentScore: doc.intentScore.toFixed(2),
+            semanticScore: doc.semanticScore.toFixed(2),
+            totalScore: doc.score.toFixed(2),
+            contentSnippet: doc.content.substring(0, 100) + '...' // Show a snippet of the content
+        }))
+    );
 
     return sortedDocs;
 }

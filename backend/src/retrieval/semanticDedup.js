@@ -9,8 +9,8 @@ import { cosineSimilarity } from "./cosineSimilarity.js";
  */
 export const semanticDedup = (documents, threshold = 0.90) => {
     const uniqueDocs = [];
-    logger.info(`Starting semantic deduplication for ${documents.length} documents (threshold = ${threshold})`);
-    
+    logger.info("DEBUG_DEDUP", `Starting semantic deduplication for ${documents.length} documents (threshold = ${threshold})`);
+
     for (const doc of documents) {
         let isDuplicate = false;
         for (const uniqueDoc of uniqueDocs) {
@@ -19,13 +19,11 @@ export const semanticDedup = (documents, threshold = 0.90) => {
             }
             const similarity = cosineSimilarity(doc.embedding, uniqueDoc.embedding);
             if (similarity >= threshold) {
-                if (process.env.DEBUG_DEDUP === "true") {
-                    logger.info("Skipping duplicate",{
-                        similarity: similarity.toFixed(2),
-                        documentSnippet: doc.content.substring(0, 100) + '...',
-                        duplicateSnippet: uniqueDoc.content.substring(0, 100) + '...'
-                    });
-                }
+                logger.info("DEBUG_DEDUP", "Skipping duplicate",{
+                    similarity: similarity.toFixed(2),
+                    documentSnippet: doc.content.substring(0, 100) + '...',
+                    duplicateSnippet: uniqueDoc.content.substring(0, 100) + '...'
+                });
                 isDuplicate = true;
                 break;
             }
@@ -35,6 +33,6 @@ export const semanticDedup = (documents, threshold = 0.90) => {
         }
     }
 
-    logger.info(`Semantic deduplication completed. ${uniqueDocs.length} unique documents retained, ${documents.length - uniqueDocs.length} duplicates removed.`);
+    logger.info("DEBUG_DEDUP", `Semantic deduplication completed. ${uniqueDocs.length} unique documents retained, ${documents.length - uniqueDocs.length} duplicates removed.`);
     return uniqueDocs;
 }

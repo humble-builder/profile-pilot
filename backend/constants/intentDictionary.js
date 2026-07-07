@@ -34,12 +34,12 @@ export const intentKeywords = {
     },
 
     "experience" : {
+        "work background": 4,
         "experience": 5,
         "work experience": 5,
         "professional experience": 5,
         "previous role": 4,
         "responsibilities": 4,
-        "worked on": 3,
         "career history": 4,
     },
 
@@ -57,6 +57,7 @@ export const intentKeywords = {
 
     "education" : {
         "education": 5,
+        "educational": 5,
         "degree": 5,
         "college": 4,
         "university": 4,
@@ -67,16 +68,20 @@ export const intentKeywords = {
     },
 
     "role_fit" : {
-        "fit": 5,
-        "suitable": 4,
-        "good match": 5,
-        "role": 3,
+        "fit": 3,
+        "suitable": 3,
+        "match": 4,
+        "aligned": 5,
+        "align": 3,
+        "aligns": 4,
+        "jd": 5,
+        "opportunities": 4,
+        "opportunity": 4,
+        "searching": 4,
+        "looking": 5,
+        "job": 3,
+        "change": 3,
         "position": 3,
-        "hire": 4,
-        "candidate": 4,
-        "backend engineer": 5,
-        "full stack": 4,
-        "ai engineer": 4,
     },
 
     "availability" : {
@@ -152,10 +157,11 @@ export const intentKeywords = {
         "show": 2,
         "every": 2,
         "brief": 2,
+        "state": 2,
     },
 
-    "explain_query" : {
-        "details": 2,
+    "detail_query" : {
+        "detail": 2,
         "information": 2,
         "explain": 2,
         "elaborate": 2,
@@ -177,5 +183,5 @@ export const intentMaxScores = {
     compensation: Object.values(intentKeywords.compensation).reduce((a, b) => a + b, 0),
     location_preference: Object.values(intentKeywords.location_preference).reduce((a, b) => a + b, 0),
     list_query: Object.values(intentKeywords.list_query).reduce((a, b) => a + b, 0),
-    explain_query: Object.values(intentKeywords.explain_query).reduce((a, b) => a + b, 0),
+    detail_query: Object.values(intentKeywords.detail_query).reduce((a, b) => a + b, 0),
 };

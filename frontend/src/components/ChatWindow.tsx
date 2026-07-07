@@ -10,13 +10,23 @@ import {
   SessionHistoryItem,
   ConversationHistoryItem,
 } from "@/types/chat";
-import { sendMessage, fetchChatHistory } from "@/services/chatApi";
+import {
+  sendMessage,
+  fetchChatHistory,
+  deleteChatHistory,
+} from "@/services/chatApi";
 import SourcePanel from "./SourcePanel";
 import AuthButton from "./AuthButton";
 import { useSession } from "next-auth/react";
 import { v4 as uuidv4 } from "uuid";
 import { GREETING_MESSAGE } from "../../constants/messages.js";
-import { SquarePen, PanelRightOpen, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  SquarePen,
+  PanelRightOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Trash2,
+} from "lucide-react";
 
 const createGreetingMessage = (): Message => ({
   id: crypto.randomUUID(),
@@ -26,7 +36,7 @@ const createGreetingMessage = (): Message => ({
 });
 
 export default function ChatWindow() {
-  const { data: authSession } = useSession();
+  const { data: authSession, status } = useSession();
   const userId = authSession?.user?.email ?? null;
 
   const [session, setSession] = useState(() => ({
@@ -40,11 +50,14 @@ export default function ChatWindow() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     null,
   );
-  const [history, setHistory] = useState<SessionHistoryItem[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>(() => [
     createGreetingMessage(),
   ]);
+  const [history, setHistory] = useState<SessionHistoryItem[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
 
   const historyItems = history.flatMap((session) =>
     session.conversations.map((conversation) => ({
@@ -54,14 +67,45 @@ export default function ChatWindow() {
     })),
   );
 
-  useEffect(() => {
+  const refreshHistory = async(userId: string | null) => {
     if (!userId) return;
-
-    (async () => {
+    try {
       const data = await fetchChatHistory(userId);
+      setHistoryError(null);
       setHistory(data);
-    })();
-  }, [userId]);
+    } catch (error) {
+      console.error("Failed to fetch chat history:", error);
+      setHistoryError("Failed to fetch chat history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (status !== "authenticated" || !userId) return;
+
+    let ignore = false;
+
+    fetchChatHistory(userId)
+      .then((data) => {
+        if (ignore) return;
+        setHistoryError(null);
+        setHistory(data);
+      })
+      .catch((error) => {
+        if (ignore) return;
+        console.error("Failed to fetch chat history:", error);
+        setHistoryError("Failed to fetch chat history.");
+      })
+      .finally(() => {
+        if (ignore) return;
+        setHistoryLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [userId, status]);
 
   const handleSend = async (text: string) => {
     if (!userId) return;
@@ -90,13 +134,13 @@ export default function ChatWindow() {
       setSelectedMessageId(botMessage.id);
       setSelectedSources(response.sources ?? []);
       setMessages((prev) => [...prev, botMessage]);
-      const data = await fetchChatHistory(userId);
-      setHistory(data);
+      refreshHistory(userId);
     } catch (error) {
+      console.error("Send message failed:", error);
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "Something went wrong.",
+        content: "I couldn't send that message. Please try again.",
         timestamp: new Date(),
       };
 
@@ -149,6 +193,27 @@ export default function ChatWindow() {
     setSelectedMessageId(null);
   };
 
+  const handleDeleteConversation = async(item: {
+    sessionId: string;
+    sessionCreatedAt: number;
+    conversation: ConversationHistoryItem;
+  }) => {
+    if (!userId) return;
+    try {
+      await deleteChatHistory(userId, item.sessionId, item.conversation.conversationId);
+      await refreshHistory(userId);
+
+      if (conversationId === item.conversation.conversationId) {
+        handleNewChat();
+      }
+      alert("Conversation deleted successfully.");
+    } catch (error) {
+      console.error("Delete conversation failed:", error);
+      alert("Failed to delete conversation.");
+    }
+
+  };
+
   return (
     <div className="flex h-full flex-col bg-gray-100">
 
@@ -176,7 +241,7 @@ export default function ChatWindow() {
             >
               {historyOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
             </button>
-            
+
             <button
               className="flex h-10 w-10 items-center justify-center rounded border border-gray-300 text-gray-700 transition hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 active:scale-90"
               onClick={handleNewChat}
@@ -192,31 +257,55 @@ export default function ChatWindow() {
               <h2 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Chat History
               </h2>
-              {historyItems.length === 0 ? (
+              {historyError && (
+                <p className="mb-2 px-2 text-xs text-gray-500">
+                  {historyError}
+                </p>
+              )}
+              {status === "loading" ? (
+                <p className="px-2 text-sm text-gray-400">Loading conversations...</p>
+              ) : status === "unauthenticated" ? (
+                <p className="px-2 text-sm text-gray-400">Sign in to view history</p>
+              ) : historyLoading && historyItems.length === 0 ? (
+                <p className="px-2 text-sm text-gray-400">Loading conversations...</p>
+              ) : !historyLoading && historyItems.length === 0 ? (
                 <p className="px-2 text-sm text-gray-400">No conversations yet</p>
               ) : (
                 <div className="flex flex-col gap-1">
                   {historyItems.map((item) => (
-                    <button
-                      className="w-full truncate rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-200"
+                    <div
+                      className="flex items-center gap-1"
                       key={item.conversation.conversationId}
-                      onClick={() =>
-                        handleHistory(item.conversation, {
-                          sessionId: item.sessionId,
-                          sessionCreatedAt: item.sessionCreatedAt,
-                        })
-                      }
-                      type="button"
-                      title={item.conversation.title}
                     >
-                      {item.conversation.title}
-                    </button>
+                      <button
+                        className="w-full truncate rounded px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-200"
+                        key={item.conversation.conversationId}
+                        onClick={() =>
+                          handleHistory(item.conversation, {
+                            sessionId: item.sessionId,
+                            sessionCreatedAt: item.sessionCreatedAt,
+                          })
+                        }
+                        type="button"
+                        title={item.conversation.title}
+                      >
+                        {item.conversation.title}
+                      </button>
+                      <button
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                        onClick={() => handleDeleteConversation(item)}
+                        type="button"
+                        title="Delete conversation"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
           )}
-            
+
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-sm">
@@ -236,7 +325,11 @@ export default function ChatWindow() {
             )}
           </div>
 
-          <ChatInput onSend={handleSend} loading={loading || !userId} />
+          <ChatInput
+            onSend={handleSend}
+            loading={loading || !userId}
+            disabledReason={!userId ? "Sign in to start a conversation" : undefined}
+          />
         </div>
 
         <div
@@ -245,8 +338,8 @@ export default function ChatWindow() {
           }`}
         >
           {sourcesOpen ? (
-            <SourcePanel 
-              sources={selectedSources} 
+            <SourcePanel
+              sources={selectedSources}
               onClose={() => setSourcesOpen(false)}
             />
           ) : (
