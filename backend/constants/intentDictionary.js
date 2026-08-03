@@ -167,6 +167,16 @@ export const intentKeywords = {
         "elaborate": 2,
         "summarize": 2,
         "describe": 2,
+    },
+
+    "evaluation_query" : {
+        "evaluate": 3,
+        "justify": 3,
+        "eligible": 3,
+        "suitable": 3,
+        "eligibility": 2,
+        "good fit": 2,
+        "right candidate": 2,
     }
 };
 
@@ -184,4 +194,5 @@ export const intentMaxScores = {
     location_preference: Object.values(intentKeywords.location_preference).reduce((a, b) => a + b, 0),
     list_query: Object.values(intentKeywords.list_query).reduce((a, b) => a + b, 0),
     detail_query: Object.values(intentKeywords.detail_query).reduce((a, b) => a + b, 0),
+    evaluation_query: Object.values(intentKeywords.evaluation_query).reduce((a, b) => a + b, 0),
 };

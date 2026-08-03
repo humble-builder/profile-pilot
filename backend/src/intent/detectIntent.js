@@ -20,7 +20,7 @@ export const detectIntent = (query) => {
         const confidence = score > 0 ? Number((score / intentMaxScores[intent]).toFixed(3)) : 0;
         let intentType = "Domain";
         if (confidence > 0) {
-            if (["list_query", "detail_query"].includes(intent)) {
+            if (["list_query", "detail_query", "evaluation_query"].includes(intent)) {
                 intentType = "Query";
                 shapeIntents.push({ intent, confidence: confidence });
             }

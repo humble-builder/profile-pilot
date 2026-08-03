@@ -5,7 +5,8 @@ import { searchWeb } from "./webSearchService.js";
 import { fuseSearchResults } from "../retrieval/fuseSearchResults.js";
 import { logger } from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
-import { CAREER_PROMPT, GENERAL_PROMPT } from "../../constants/prompts.js";
+import { CAREER_PROMPT, GENERAL_PROMPT, EVALUATION_PROMPT } from "../../constants/prompts.js";
+import { detectIntent } from "../intent/detectIntent.js";
 
 /**
  * Service to perform RAG operations (search doc, retreive history, call LLM service)
@@ -21,6 +22,7 @@ export const getAnswer = async (query) => {
     const fusedResults = [];
     let prompt = [];
     const sources = [];
+    const requestContext = {}
 
     // Retreive conversation history for the user to provide context to the LLM
     const conversation = await getConversation(query);
@@ -39,7 +41,13 @@ export const getAnswer = async (query) => {
      * Fallback to generic LLM response if search fails
      */
 
-    retreivedDocs.push(...await searchSimilarDocs(message)); // default vector search with cosine similarity
+    requestContext.message = message;
+    requestContext.intent = detectIntent(message);
+    requestContext.isEvaluationQuery = requestContext.intent.detectedIntents.shapeIntents
+        .some(item => item.intent === "evaluation_query");
+    requestContext.assistantPrompt = requestContext.isEvaluationQuery ? EVALUATION_PROMPT : CAREER_PROMPT;
+
+    retreivedDocs.push(...await searchSimilarDocs(requestContext)); // default vector search with cosine similarity
     const topScore = retreivedDocs.length > 0 ? retreivedDocs[0].score : 0;
     logger.info("DEBUG_RETRIEVAL", "Top retrieval score: ", topScore);
 
@@ -61,7 +69,7 @@ export const getAnswer = async (query) => {
     if (shouldUseWebSearch && (webSearchFailed || webSearchLowConfidence)) {
         logger.info("DEBUG_RETRIEVAL", "Web search yielded no results.");
 
-        prompt = buildPrompt(false, false, history, message, [], []); // build prompt without any context
+        prompt = buildPrompt(requestContext, false, false, history, [], []); // build prompt without any context
         const fallbackReply = await getLLMResponse(prompt);
 
         return { reply: fallbackReply, sources: [] }
@@ -81,7 +89,7 @@ export const getAnswer = async (query) => {
         logger.info("DEBUG_RETRIEVAL", "Top fused result score: ", fusedResults[0]?.finalScore);
 
         // For hybrid approach, include fused results in the prompt
-        prompt = buildPrompt(true,true,history,message,[],[],fusedResults);
+        prompt = buildPrompt(requestContext, true,true,history,[],[],fusedResults);
     }
 
     logger.info("DEBUG_THRESHOLD", `Debug logs for threshold tuning:\n
@@ -94,12 +102,12 @@ export const getAnswer = async (query) => {
     // If only vector results are relevant, include retreived documents in the prompt
     if (!shouldRetrieveWeb && shouldRetrieveVector) {
         logger.info("DEBUG_RETRIEVAL", "High document retrieval confidence.")
-        prompt = buildPrompt(true,false,history,message,retreivedDocs);
+        prompt = buildPrompt(requestContext, true,false,history,retreivedDocs);
     }
 
     // If only web results are relevant, include web search results in the prompt
     if (shouldRetrieveWeb && !shouldRetrieveVector) {
-        prompt = buildPrompt(false,true,history,message,[],webSearchResults);
+        prompt = buildPrompt(requestContext, false,true,history,[],webSearchResults);
     }
 
     const reply = await getLLMResponse(prompt);
@@ -183,8 +191,9 @@ export const getAnswer = async (query) => {
  * @param {*} fusedResults fused search results to include in prompt
  */
 
-const buildPrompt = (useVector, useWeb, history, message, vectorResults, webResults, fusedResults) => {
+const buildPrompt = (requestContext, useVector, useWeb, history, vectorResults, webResults, fusedResults) => {
 
+    const { message, assistantPrompt } = requestContext;
     const pastContext = history.length
         ? history.map((item) => ({role: item.role, content: item.content}))
         : [];
@@ -213,7 +222,7 @@ const buildPrompt = (useVector, useWeb, history, message, vectorResults, webResu
     prompt.push({
         role: "system",
         content: `
-            ${CAREER_PROMPT}
+            ${assistantPrompt}
 
             Context:
                 ${context}

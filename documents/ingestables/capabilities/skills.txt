@@ -19,10 +19,13 @@ AI and LLM skills:
 - Enterprise-level hands-on experience with:
     * Prompt engineering
     * Chatbot development using deterministic and agentic flows
+    * AI Agent building platforms like Kore.AI, Cognigy, AWS Lex, Amelia etc.
+    * Google CCAI platform
 
 Backend skills:
 Say Vishal has hands-on experience building REST APIs and backend services. Use these points to build your answer:
 - Microservices-based architecture
+- GCP Services
 - Express.js framework
 - Node.js and NestJS runtime environments
 - JavaScript and TypeScript codebases
