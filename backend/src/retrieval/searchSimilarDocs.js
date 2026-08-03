@@ -16,8 +16,8 @@ export const searchSimilarDocs = async (query) => {
         apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const queryIntent = detectIntent(query);
-    const queryEmbedding = await embeddings.embedQuery(query);
+    const { message: userQuery, intent: userIntent } = query;
+    const queryEmbedding = await embeddings.embedQuery(userQuery);
     const documents = await documentsCollection.find({}).toArray();
 
     const scoredDocs = documents
@@ -27,15 +27,44 @@ export const searchSimilarDocs = async (query) => {
             semanticScore: cosineSimilarity(queryEmbedding, doc.embedding),
         }));
 
-    const rerankedDocs = rerankDocuments(scoredDocs, queryIntent);
-    const uniqueDocs = semanticDedup(rerankedDocs, 0.90);
+    const rerankedDocs = rerankDocuments(scoredDocs, userIntent);
     let k = 5; // Default number of top documents to return
 
-    if (queryIntent.detectedIntents.shapeIntents.length > 0) {
-        const mappedIntentMetadata = intentToDocumentMap[queryIntent.predictedIntent];
-        const queryShapes = queryIntent.detectedIntents.shapeIntents.toSorted((a, b) => b.confidence - a.confidence);
+    if (userIntent.detectedIntents.shapeIntents.length > 0) {
+        const mappedIntentMetadata = intentToDocumentMap[userIntent.predictedIntent];
+        const queryShapes = userIntent.detectedIntents.shapeIntents.toSorted((a, b) => b.confidence - a.confidence);
         if (queryShapes[0].intent === "detail_query") {
             k = 10; // Return top 10 relevant documents for detail queries
+        }
+        else if (queryShapes[0].intent === "evaluation_query") {
+            // Return relevant documents from multiple sources under category from matched intent metadata
+            if (!mappedIntentMetadata) return [];
+            const matchedCategoryDocs = rerankedDocs
+                .filter(doc => 
+                    doc.metadata.category === mappedIntentMetadata.category
+                );
+
+            const sourceCategoryHashMap = {};
+            const reducedDocChunks = [];
+            for (const doc of matchedCategoryDocs) {
+                const key = `${doc.metadata.category}-${doc.metadata.source}`;
+                if (sourceCategoryHashMap[key] === undefined) {
+                    reducedDocChunks.push(doc);
+                    sourceCategoryHashMap[key] = 1;
+                }
+                else if (
+                    (doc.metadata.source === mappedIntentMetadata.source
+                    && sourceCategoryHashMap[key] < 5)
+                    ||
+                    (doc.metadata.source !== mappedIntentMetadata.source
+                    && sourceCategoryHashMap[key] < 3)
+                ) {
+                    reducedDocChunks.push(doc);
+                    sourceCategoryHashMap[key] += 1;
+                }
+            }
+
+            return reducedDocChunks;
         }
         else {
             if (!mappedIntentMetadata) return [];
@@ -51,6 +80,7 @@ export const searchSimilarDocs = async (query) => {
         }
     }
 
+    const uniqueDocs = semanticDedup(rerankedDocs, 0.90);
     return uniqueDocs.slice(0, k); // Return top k relevant documents
 };
 

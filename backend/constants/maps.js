@@ -20,7 +20,7 @@ export const intentToDocumentMap = {
         "source": "education.txt",
     },
     "role_fit": {
-        "category": "hiring",
+        "category": "capabilities",
         "source": "role_fit.txt",
     },
     "availability": {

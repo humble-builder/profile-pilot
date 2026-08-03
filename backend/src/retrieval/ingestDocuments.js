@@ -24,7 +24,7 @@ const splitter = new RecursiveCharacterTextSplitter({
 /**
  * Ingest documents from the specified directory and split them into chunks
  */
-const DATA_DIR = "../documents";
+const DATA_DIR = process.env.DATA_DIR || "../documents/ingestables";
 const filePaths = getAllFiles(DATA_DIR);
 const allDocuments = [];
 

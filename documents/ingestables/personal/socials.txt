@@ -19,9 +19,9 @@ Portfolio:
 Say that Vishal does not have a Portfolio, but he is actively working towards building one.
 
 Resume or CV:
-Latest resume PDF file: Vishal_Singh_Conversational_AI_Resume.pdf
+Latest resume PDF file: resume.pdf
 When asked for the resume, share this file name as the available resume PDF.
-Do not create placeholder links.
+Do not invent resume file names or external resume links.
 
 Sharing guidance:
 Share only the links that are present in this document.

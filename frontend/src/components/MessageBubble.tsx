@@ -12,6 +12,13 @@ export default function MessageBubble({
   onViewSources
 }: Props) {
   const isUser = message.role === "user";
+  const downloadableFileMatch = !isUser
+    ? message.content.match(/\b[\w.-]+\.pdf\b/i)
+    : null;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const downloadUrl = downloadableFileMatch && apiUrl
+    ? `${apiUrl}/service/files/${downloadableFileMatch[0]}`
+    : null;
 
   return (
     <div
@@ -39,6 +46,17 @@ export default function MessageBubble({
             {message.content}
           </ReactMarkdown>
         </div>
+        {downloadUrl ? (
+          <a
+            href={downloadUrl}
+            download
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-block rounded-md border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+          >
+            Download resume
+          </a>
+        ) : null}
         {!isUser && message.sources?.length ? (
           <button
             type="button"
