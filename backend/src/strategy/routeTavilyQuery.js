@@ -1,7 +1,6 @@
-import { 
+import {
   researchBoundKeywords,
-  currentEventKeywords,
-  marketFreshnessKeywords,
+  freshnessKeywords,
   quickLookupKeywords,
 } from "../../constants/tavilyQueryKeywords.js";
 
@@ -15,7 +14,7 @@ import { queryConfigs } from "../../constants/tavilyQueryConfig.js";
 export const routeTavilyConfig = (query) => {
   const q = query.toLowerCase();
   const isShortQuery = q.length < 40;
-  const isNewsBasedQuery = matchIfAny(q, currentEventKeywords) || matchIfAny(q, marketFreshnessKeywords);
+  const isNewsBasedQuery = matchIfAny(q, freshnessKeywords);
   const isResearchBasedQuery = matchIfAny(q, researchBoundKeywords);
   const isLookupBasedQuery = isShortQuery && matchIfAny(q, quickLookupKeywords) && !isResearchBasedQuery;
 

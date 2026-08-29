@@ -1,14 +1,11 @@
-export const currentEventKeywords = [
+export const freshnessKeywords = [
     "latest",
     "today",
     "news",
     "update",
     "breaking",
-    "current",
     "recent",
-];
-
-export const marketFreshnessKeywords = [
+    "trending",
     "current market",
     "market update",
     "recent market",

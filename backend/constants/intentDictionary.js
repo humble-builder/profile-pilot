@@ -171,6 +171,10 @@ export const intentKeywords = {
 
     "evaluation_query" : {
         "evaluate": 3,
+        "compare": 3,
+        "comparison": 3,
+        "versus": 3,
+        "vs": 2,
         "justify": 3,
         "eligible": 3,
         "suitable": 3,
