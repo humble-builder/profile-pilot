@@ -42,6 +42,7 @@ const selectVectorStrategy = ({ signals, hasEvaluationIntent }) => {
         hasProfileOwner,
         hasExternalReference,
         hasUnresolvedReference,
+        hasUnresolvedComparisonTarget,
         hasContextualPronoun,
         requiresCurrentInformation,
         isGeneralKnowledge,
@@ -61,11 +62,21 @@ const selectVectorStrategy = ({ signals, hasEvaluationIntent }) => {
 
     if (hasProfileOwner && hasExternalReference) {
         return createVectorStrategy({
-            strategy: "hybrid",
-            vectorPolicy: "required",
-            webPolicy: "required",
+            strategy: "safe",
+            vectorPolicy: "blocked",
+            webPolicy: "blocked",
             fallbackStrategy: "safe_response",
-            reason: "The query compares the profile owner with an external entity.",
+            reason: "The external person's verified profile is not available.",
+        });
+    }
+
+    if (hasUnresolvedComparisonTarget) {
+        return createVectorStrategy({
+            strategy: "safe",
+            vectorPolicy: "blocked",
+            webPolicy: "blocked",
+            fallbackStrategy: "safe_response",
+            reason: "The comparison target is not available as a verified profile.",
         });
     }
 
@@ -81,11 +92,11 @@ const selectVectorStrategy = ({ signals, hasEvaluationIntent }) => {
 
     if (hasExternalReference) {
         return createVectorStrategy({
-            strategy: "web",
+            strategy: "safe",
             vectorPolicy: "blocked",
-            webPolicy: "required",
+            webPolicy: "blocked",
             fallbackStrategy: "safe_response",
-            reason: "The query concerns a resolved external entity.",
+            reason: "The external person's verified profile is not available.",
         });
     }
 
@@ -154,6 +165,14 @@ export const routeVectorQuery = ({ message, intentResult, entityResult }) => {
         entity.entityRole === "contextual"
     );
 
+    const hasComparisonMarker = normalizedQuery.includes("compare")
+        || normalizedQuery.includes("comparison")
+        || normalizedQuery.includes("versus")
+        || /\bvs\b/.test(normalizedQuery);
+    const hasUnresolvedComparisonTarget = hasProfileOwner
+        && !hasExternalReference
+        && hasComparisonMarker;
+
     const hasCurrentMarketContext = normalizedQuery.includes("current")
         && normalizedQuery.includes("market");
     const requiresCurrentInformation = matchIfAny(normalizedQuery, freshnessKeywords)
@@ -179,6 +198,7 @@ export const routeVectorQuery = ({ message, intentResult, entityResult }) => {
         hasProfileOwner,
         hasExternalReference,
         hasUnresolvedReference,
+        hasUnresolvedComparisonTarget,
         hasContextualPronoun,
         requiresCurrentInformation,
         isGeneralKnowledge,
