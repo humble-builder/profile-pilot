@@ -38,27 +38,24 @@ export const searchSimilarDocs = async (query) => {
         }
         else if (queryShapes[0].intent === "evaluation_query") {
             // Return relevant documents from multiple sources under category from matched intent metadata
-            if (!mappedIntentMetadata) return [];
-            const matchedCategoryDocs = rerankedDocs
-                .filter(doc => 
+            const matchedCategoryDocs = mappedIntentMetadata
+                ? rerankedDocs.filter((doc) =>
                     doc.metadata.category === mappedIntentMetadata.category
-                );
+                )
+                : rerankedDocs;
 
             const sourceCategoryHashMap = {};
             const reducedDocChunks = [];
             for (const doc of matchedCategoryDocs) {
                 const key = `${doc.metadata.category}-${doc.metadata.source}`;
+                const isMappedSource = doc.metadata.source === mappedIntentMetadata?.source;
+                const sourceChunkLimit = isMappedSource ? 5 : 3;
+
                 if (sourceCategoryHashMap[key] === undefined) {
                     reducedDocChunks.push(doc);
                     sourceCategoryHashMap[key] = 1;
                 }
-                else if (
-                    (doc.metadata.source === mappedIntentMetadata.source
-                    && sourceCategoryHashMap[key] < 5)
-                    ||
-                    (doc.metadata.source !== mappedIntentMetadata.source
-                    && sourceCategoryHashMap[key] < 3)
-                ) {
+                else if (sourceCategoryHashMap[key] < sourceChunkLimit) {
                     reducedDocChunks.push(doc);
                     sourceCategoryHashMap[key] += 1;
                 }
@@ -83,4 +80,3 @@ export const searchSimilarDocs = async (query) => {
     const uniqueDocs = semanticDedup(rerankedDocs, 0.90);
     return uniqueDocs.slice(0, k); // Return top k relevant documents
 };
-

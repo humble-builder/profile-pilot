@@ -1,5 +1,5 @@
 import { tavily } from '@tavily/core';
-import { routeTavilyConfig } from '../routing/routeTavilyQuery.js';
+import { routeTavilyConfig } from '../strategy/routeTavilyQuery.js';
 import { hashContent } from '../utils/hashContent.js'; 
 import { logger } from '../utils/logger.js';
 
