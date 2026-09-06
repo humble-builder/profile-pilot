@@ -5,6 +5,7 @@ const client = new MongoClient(process.env.MONGO_URI);
 export let documentsCollection;
 export let sessionsCollection;
 export let ingestionManifestCollection;
+export let applicationSettingsCollection;
 
 export const runInTransaction = async (operation) => {
     const session = client.startSession();
@@ -25,6 +26,7 @@ export const connectDB = async () => {
         documentsCollection = db.collection("documents");
         sessionsCollection = db.collection("sessions");
         ingestionManifestCollection = db.collection("ingestion_manifest");
+        applicationSettingsCollection = db.collection("application_settings");
 
     } catch (err) {
         console.error("MongoDB connection failed", err);

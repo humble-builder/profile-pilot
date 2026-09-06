@@ -1,0 +1,149 @@
+name: profilepilot
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  mongo:
+    image: ${PROFILEPILOT_MONGO_IMAGE:-mongo:7.0}
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - data
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mongo-init:
+    image: ${PROFILEPILOT_MONGO_IMAGE:-mongo:7.0}
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command:
+      - mongosh
+      - --quiet
+      - --host
+      - mongo:27017
+      - --eval
+      - |
+        try {
+          rs.status();
+        } catch (error) {
+          rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
+        }
+        while (!db.hello().isWritablePrimary) { sleep(1000); }
+    networks:
+      - data
+    logging: *default-logging
+
+  backend:
+    image: ${PROFILEPILOT_BACKEND_IMAGE:-ghcr.io/humble-builder/profile-pilot-backend:unreleased}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/profile_pilot?replicaSet=rs0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-ada-002}
+      OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-}
+      OPENAI_EMBEDDING_BATCH_SIZE: ${OPENAI_EMBEDDING_BATCH_SIZE:-100}
+      OPENAI_EMBEDDING_TIMEOUT_MS: ${OPENAI_EMBEDDING_TIMEOUT_MS:-30000}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?ADMIN_API_TOKEN is required}
+      DATA_DIR: /app/documents/ingestables
+      UPLOAD_DIR: /app/documents/downloadables
+    volumes:
+      - ./documents/ingestables:/app/documents/ingestables
+      - ./documents/downloadables:/app/documents/downloadables:ro
+    expose:
+      - "5000"
+    networks:
+      - app
+      - data
+    logging: *default-logging
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:5000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    image: ${PROFILEPILOT_FRONTEND_IMAGE:-ghcr.io/humble-builder/profile-pilot-frontend:unreleased}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:?AUTH_GOOGLE_ID is required}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:?AUTH_GOOGLE_SECRET is required}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?ADMIN_API_TOKEN is required}
+      INTERNAL_API_URL: http://backend:5000
+      AUTH_TRUST_HOST: "true"
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - app
+    logging: *default-logging
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000').then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  mongo_data:
+
+networks:
+  app:
+  data:
+    internal: true

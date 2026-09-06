@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getRuntimeSettings } from "../config/runtimeSettings.js";
 
 const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -6,7 +7,7 @@ const client = new OpenAI({
 
 export const getLLMResponse = async (messages) => {
     const stream = await client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: getRuntimeSettings().chatModel,
         messages,
         stream: true
     });
