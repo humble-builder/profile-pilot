@@ -4,6 +4,17 @@ const client = new MongoClient(process.env.MONGO_URI);
 
 export let documentsCollection;
 export let sessionsCollection;
+export let ingestionManifestCollection;
+
+export const runInTransaction = async (operation) => {
+    const session = client.startSession();
+
+    try {
+        return await session.withTransaction(() => operation(session));
+    } finally {
+        await session.endSession();
+    }
+};
 
 export const connectDB = async () => {
     try {
@@ -13,9 +24,11 @@ export const connectDB = async () => {
         const db = client.db("profile_pilot");
         documentsCollection = db.collection("documents");
         sessionsCollection = db.collection("sessions");
+        ingestionManifestCollection = db.collection("ingestion_manifest");
 
     } catch (err) {
         console.error("MongoDB connection failed", err);
+        throw err;
     }
 
 };

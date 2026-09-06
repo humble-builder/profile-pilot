@@ -1,6 +1,5 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { documentsCollection } from "../config/db.js";
-import { detectIntent } from "../intent/detectIntent.js";
 import { rerankDocuments } from "./rerankDocuments.js";
 import { cosineSimilarity } from "./cosineSimilarity.js";
 import { semanticDedup } from "./semanticDedup.js";
@@ -18,7 +17,10 @@ export const searchSimilarDocs = async (query) => {
 
     const { message: userQuery, intent: userIntent } = query;
     const queryEmbedding = await embeddings.embedQuery(userQuery);
-    const documents = await documentsCollection.find({}).toArray();
+    const documents = await documentsCollection.find({
+        active: true,
+        "metadata.sourceType": "vector",
+    }).toArray();
 
     const scoredDocs = documents
         .filter((doc) => doc.embedding !== undefined && doc.embedding !== null)
