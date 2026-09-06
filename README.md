@@ -167,6 +167,99 @@ DELETE /chat/:sessionId/:conversationId?userId=recruiter@example.com
 
 ## Local Setup
 
+### Official installer prerequisites
+
+The release installer runs the complete local stack from approved, digest-pinned
+container images. It does not build the frontend or backend on the user's
+machine. MongoDB and the backend are not published directly to the host; the
+frontend proxies `/backend/*` requests to the internal backend service.
+
+Before installation, the user needs:
+
+* Docker Desktop or Docker Engine with Docker Compose v2, running locally
+* Internet access to pull the official images and call the configured AI APIs
+* An OpenAI API key with access to the selected chat and embedding models
+* Google OAuth client ID and secret, with
+  `http://localhost:3000/api/auth/callback/google` configured as a redirect URI
+* The Google account email that should be allowed to manage profile sources
+* A Tavily API key only when optional web search is enabled
+* Profile documents in PDF, DOCX, or TXT format
+* An available local frontend port (port `3000` by default)
+
+The installer supplies the approved image digests, generates the local auth and
+backend admin tokens, writes the local `.env`, and places selected documents in the mounted
+`documents/` directory. OpenAI and OAuth secrets are passed at runtime and are
+never baked into either application image.
+
+After installation, the application is controlled with:
+
+```powershell
+.\scripts\profilepilot.ps1 start
+```
+
+After changing environment-managed secrets, recreate the application services:
+
+```powershell
+.\scripts\profilepilot.ps1 restart
+```
+
+The restart preserves the MongoDB volume. Backend startup runs incremental
+ingestion, so unchanged document chunks reuse their existing embeddings.
+Non-secret chat and embedding settings are managed through the authenticated
+settings API and persist in MongoDB without editing `.env`.
+
+The reusable, authenticated Profile Settings panel supports runtime model
+settings and PDF, DOCX, and TXT uploads up to 10 MB. It remains separate from
+the recruiter-facing chat. Chat-model, embedding batch-size, and timeout changes
+apply without re-ingestion. Embedding model or dimension changes prepare all
+replacement revisions first, then atomically switch the active configuration and
+documents. The configured admin may activate a successful document ingestion
+immediately or leave it staged for review. Duplicate uploads return a conflict
+without failing normal startup ingestion. Staged state survives restart: the UI reads
+`activeSourceRevision`, `latestSourceRevision`, and `updateAvailable` through an
+authenticated server route, and “Use latest revision” performs an atomic pointer
+switch in MongoDB.
+
+On macOS or Linux, use `./scripts/profilepilot.sh` with the same actions.
+
+Official startup rejects application or MongoDB images that are not pinned by
+SHA-256 digest or are outside the approved image repositories. Application
+containers run as non-root with a read-only root filesystem, Linux capabilities
+dropped, privilege escalation disabled, bounded process counts, and rotated
+local logs. Only the backend can write the ingestable-document mount; downloadable
+files remain read-only. MongoDB data remains in its private named volume and
+internal network.
+
+Official images are published only when a GitHub Release is published. The
+release workflow uses commit-pinned build actions, publishes to the
+`humble-builder` GitHub Container Registry namespace, attaches SBOM and maximum
+provenance metadata, creates GitHub artifact attestations, and reports the exact
+image digests required by installer packaging. The installer must copy those
+digests into its generated configuration; mutable image tags are rejected.
+Repository settings should protect the `official-release` environment with a
+required maintainer approval.
+
+This protects the official distribution path from unreviewed source changes. A
+machine administrator can still replace software on their own computer, and a
+public repository can still be forked; neither action changes an official image
+or the upstream repository.
+
+### Contributor Docker setup
+
+Contributors may build from source with the development override. These images
+are separate from installer images and cannot become an official release until
+their changes are reviewed, merged, and published through the release pipeline.
+
+```powershell
+Copy-Item .env.example .env
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+Fill in the API and OAuth values in `.env` before starting. The placeholder
+official image digests are ignored by the development override.
+
+### Manual development setup
+
 Install backend dependencies:
 
 ```bash
@@ -202,6 +295,12 @@ Create `frontend/.env.local` with the backend URL and auth settings used by your
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
+INTERNAL_API_URL=http://localhost:5000
+AUTH_SECRET=your_local_auth_secret
+AUTH_GOOGLE_ID=your_google_oauth_client_id
+AUTH_GOOGLE_SECRET=your_google_oauth_client_secret
+ADMIN_EMAIL=your_admin_email
+ADMIN_API_TOKEN=the_same_value_used_by_the_backend
 ```
 
 Start the frontend:

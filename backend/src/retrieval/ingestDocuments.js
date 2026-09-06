@@ -13,10 +13,15 @@ import {
 import { loadDocument } from "../data/loadDataFiles.js";
 import { startCursor, stopCursor } from "../utils/taskProgressCursor.js";
 import { logger } from "../utils/logger.js";
-
-const embeddings = new OpenAIEmbeddings({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+import {
+    createEmbeddingConfigHash,
+    LEGACY_OPENAI_EMBEDDING_CONFIG_HASH,
+} from "../config/env.js";
+import {
+    getRuntimeSettings,
+    persistRuntimeSettings,
+    setRuntimeSettings,
+} from "../config/runtimeSettings.js";
 
 const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 500,
@@ -25,6 +30,9 @@ const splitter = new RecursiveCharacterTextSplitter({
 
 const DATA_DIR = process.env.DATA_DIR || "../documents/ingestables";
 const PREVIOUS_REVISIONS_TO_RETAIN = 3;
+let embeddingMigrationInProgress = false;
+
+export const isEmbeddingMigrationInProgress = () => embeddingMigrationInProgress;
 
 const createChunkKey = (chunkHash, occurrence) => `${chunkHash}:${occurrence}`;
 const createSourceRevisionId = (sourceId, createdAt) => hashContent(
@@ -94,12 +102,26 @@ const getExistingSourceDocuments = async ({ source, sourceId, category, manifest
 const arraysMatch = (left, right) => left.length === right.length
     && left.every((item, index) => item === right[index]);
 
-const embedMissingChunks = async (chunks) => {
+const embedWithOpenAI = async (texts, embeddingConfig) => {
+    const embeddings = new OpenAIEmbeddings({
+        apiKey: process.env.OPENAI_API_KEY,
+        ...embeddingConfig,
+    });
+    return embeddings.embedDocuments(texts);
+};
+
+const embedMissingChunks = async (
+    chunks,
+    embeddingConfig
+) => {
     if (!chunks.length) return [];
 
-    const chunkBatches = generateBatches(chunks.map((chunk) => chunk.content), 100);
+    const chunkBatches = generateBatches(
+        chunks.map((chunk) => chunk.content),
+        embeddingConfig.batchSize
+    );
     const embeddedBatches = await Promise.all(
-        chunkBatches.map((batch) => embeddings.embedDocuments(batch))
+        chunkBatches.map((batch) => embedWithOpenAI(batch, embeddingConfig))
     );
     const embeddingsArray = embeddedBatches.flat();
 
@@ -110,16 +132,27 @@ const embedMissingChunks = async (chunks) => {
     return embeddingsArray;
 };
 
-const stageSourceRevision = async ({ sourceDetails, existingDocuments, sourceRevision }) => {
+const stageSourceRevision = async ({
+    sourceDetails,
+    existingDocuments,
+    sourceRevision,
+    canReuseEmbeddings,
+    embeddingConfig,
+    embeddingConfigHash,
+}) => {
     const existingChunks = addChunkKeys(existingDocuments);
     const existingByChunkKey = new Map(existingChunks.map((document) => [
         document.metadata.chunkKey,
         document,
     ]));
     const chunksNeedingEmbeddings = sourceDetails.chunks.filter((chunk) =>
-        !existingByChunkKey.get(chunk.metadata.chunkKey)?.embedding
+        !canReuseEmbeddings
+        || !existingByChunkKey.get(chunk.metadata.chunkKey)?.embedding
     );
-    const generatedEmbeddings = await embedMissingChunks(chunksNeedingEmbeddings);
+    const generatedEmbeddings = await embedMissingChunks(
+        chunksNeedingEmbeddings,
+        embeddingConfig
+    );
     const generatedEmbeddingByChunkKey = new Map(chunksNeedingEmbeddings.map((chunk, index) => [
         chunk.metadata.chunkKey,
         generatedEmbeddings[index],
@@ -127,8 +160,10 @@ const stageSourceRevision = async ({ sourceDetails, existingDocuments, sourceRev
     const currentDateTime = Date.now();
     const stagingOperations = sourceDetails.chunks.map((chunk) => {
         const existingDocument = existingByChunkKey.get(chunk.metadata.chunkKey);
-        const embedding = existingDocument?.embedding
-            ?? generatedEmbeddingByChunkKey.get(chunk.metadata.chunkKey);
+        const embedding = canReuseEmbeddings
+            ? (existingDocument?.embedding
+                ?? generatedEmbeddingByChunkKey.get(chunk.metadata.chunkKey))
+            : generatedEmbeddingByChunkKey.get(chunk.metadata.chunkKey);
 
         if (!embedding) {
             throw new Error(`Missing embedding for chunk ${chunk.metadata.chunkKey}`);
@@ -154,6 +189,7 @@ const stageSourceRevision = async ({ sourceDetails, existingDocuments, sourceRev
                         "metadata.chunk": chunk.metadata.chunk,
                         "metadata.hash": chunk.metadata.hash,
                         "metadata.chunkKey": chunk.metadata.chunkKey,
+                        "metadata.embeddingConfigHash": embeddingConfigHash,
                         "metadata.lastUpdatedAt": currentDateTime,
                     },
                     $setOnInsert: {
@@ -173,7 +209,14 @@ const stageSourceRevision = async ({ sourceDetails, existingDocuments, sourceRev
 };
 
 const normalizeManifestRevisions = (manifest) => {
-    if (manifest?.revisions?.length) return manifest.revisions;
+    if (manifest?.revisions?.length) {
+        return manifest.revisions.map((revision) => ({
+            ...revision,
+            embeddingConfigHash: revision.embeddingConfigHash
+                ?? manifest.embeddingConfigHash
+                ?? LEGACY_OPENAI_EMBEDDING_CONFIG_HASH,
+        }));
+    }
     if (!manifest?.activeSourceRevision) return [];
 
     return [{
@@ -181,12 +224,20 @@ const normalizeManifestRevisions = (manifest) => {
         sourceHash: manifest.sourceHash,
         chunkKeys: manifest.chunkKeys ?? [],
         chunkCount: manifest.chunkCount ?? 0,
+        embeddingConfigHash: manifest.embeddingConfigHash
+            ?? LEGACY_OPENAI_EMBEDDING_CONFIG_HASH,
         createdAt: manifest.lastUpdatedAt ?? manifest.createdAt ?? 0,
         lastActivatedAt: manifest.lastUpdatedAt ?? manifest.createdAt ?? 0,
     }];
 };
 
-const createRevisionEntry = ({ sourceDetails, sourceRevision, createdAt }) => {
+const createRevisionEntry = ({
+    sourceDetails,
+    sourceRevision,
+    createdAt,
+    activated,
+    embeddingConfigHash,
+}) => {
     const chunkKeys = sourceDetails.chunks.map((chunk) => chunk.metadata.chunkKey);
 
     return {
@@ -194,16 +245,51 @@ const createRevisionEntry = ({ sourceDetails, sourceRevision, createdAt }) => {
         sourceHash: hashContent(chunkKeys.join("|")),
         chunkKeys,
         chunkCount: chunkKeys.length,
+        embeddingConfigHash,
         createdAt,
-        lastActivatedAt: createdAt,
+        lastActivatedAt: activated ? createdAt : null,
     };
 };
 
-const activateSourceRevision = async ({ sourceDetails, sourceRevision, createdAt }) => {
+const retainSourceRevisions = ({ revisions, activeRevisionId, latestRevisionId }) => {
+    const maximumRevisions = PREVIOUS_REVISIONS_TO_RETAIN + 1;
+    const sortedRevisions = revisions.toSorted(
+        (left, right) => right.createdAt - left.createdAt
+    );
+    const requiredRevisionIds = new Set(
+        [activeRevisionId, latestRevisionId].filter(Boolean)
+    );
+    const retainedRevisions = sortedRevisions.filter((revision) =>
+        requiredRevisionIds.has(revision.id)
+    );
+
+    for (const revision of sortedRevisions) {
+        if (retainedRevisions.length >= maximumRevisions) break;
+        if (!retainedRevisions.some((retained) => retained.id === revision.id)) {
+            retainedRevisions.push(revision);
+        }
+    }
+
+    const retainedRevisionIds = new Set(retainedRevisions.map((revision) => revision.id));
+    const prunedRevisionIds = sortedRevisions
+        .filter((revision) => !retainedRevisionIds.has(revision.id))
+        .map((revision) => revision.id);
+
+    return { retainedRevisions, prunedRevisionIds };
+};
+
+const activateSourceRevision = async ({
+    sourceDetails,
+    sourceRevision,
+    createdAt,
+    embeddingConfigHash,
+}) => {
     const revisionEntry = createRevisionEntry({
         sourceDetails,
         sourceRevision,
         createdAt,
+        activated: true,
+        embeddingConfigHash,
     });
 
     return runInTransaction(async (session) => {
@@ -212,16 +298,12 @@ const activateSourceRevision = async ({ sourceDetails, sourceRevision, createdAt
             { session }
         );
         const previousRevisions = normalizeManifestRevisions(currentManifest)
-            .filter((revision) => revision.id !== sourceRevision)
-            .toSorted((left, right) => right.createdAt - left.createdAt);
-        const retainedRevisions = [
-            revisionEntry,
-            ...previousRevisions.slice(0, PREVIOUS_REVISIONS_TO_RETAIN),
-        ];
-        const retainedRevisionIds = new Set(retainedRevisions.map((revision) => revision.id));
-        const prunedRevisionIds = previousRevisions
-            .filter((revision) => !retainedRevisionIds.has(revision.id))
-            .map((revision) => revision.id);
+            .filter((revision) => revision.id !== sourceRevision);
+        const { retainedRevisions, prunedRevisionIds } = retainSourceRevisions({
+            revisions: [revisionEntry, ...previousRevisions],
+            activeRevisionId: sourceRevision,
+            latestRevisionId: sourceRevision,
+        });
         const previousRevisionFilter = {
             "metadata.sourceType": "vector",
             $or: [
@@ -263,9 +345,12 @@ const activateSourceRevision = async ({ sourceDetails, sourceRevision, createdAt
                     sourceId: sourceDetails.sourceId,
                     category: sourceDetails.category,
                     activeSourceRevision: sourceRevision,
+                    latestSourceRevision: sourceRevision,
+                    updateAvailable: false,
                     sourceHash: revisionEntry.sourceHash,
                     chunkKeys: revisionEntry.chunkKeys,
                     chunkCount: revisionEntry.chunkCount,
+                    embeddingConfigHash: revisionEntry.embeddingConfigHash,
                     revisions: retainedRevisions,
                     lastUpdatedAt: createdAt,
                 },
@@ -277,6 +362,80 @@ const activateSourceRevision = async ({ sourceDetails, sourceRevision, createdAt
         );
 
         return { prunedRevisionIds };
+    });
+};
+
+const recordStagedSourceRevision = async ({
+    sourceDetails,
+    sourceRevision,
+    createdAt,
+    embeddingConfigHash,
+}) => {
+    const revisionEntry = createRevisionEntry({
+        sourceDetails,
+        sourceRevision,
+        createdAt,
+        activated: false,
+        embeddingConfigHash,
+    });
+
+    return runInTransaction(async (session) => {
+        const currentManifest = await ingestionManifestCollection.findOne(
+            { _id: sourceDetails.sourceId },
+            { session }
+        );
+
+        if (!currentManifest?.activeSourceRevision) {
+            throw new Error(`Cannot stage a revision without an active source revision`);
+        }
+
+        const previousPendingRevisionId = currentManifest.latestSourceRevision
+            !== currentManifest.activeSourceRevision
+            ? currentManifest.latestSourceRevision
+            : null;
+        const previousRevisions = normalizeManifestRevisions(currentManifest)
+            .filter((revision) => revision.id !== sourceRevision)
+            .filter((revision) => revision.id !== previousPendingRevisionId);
+        const { retainedRevisions, prunedRevisionIds } = retainSourceRevisions({
+            revisions: [revisionEntry, ...previousRevisions],
+            activeRevisionId: currentManifest.activeSourceRevision,
+            latestRevisionId: sourceRevision,
+        });
+
+        const stagedChunkCount = await documentsCollection.countDocuments(
+            {
+                "metadata.sourceId": sourceDetails.sourceId,
+                sourceRevision,
+                active: false,
+            },
+            { session }
+        );
+
+        if (stagedChunkCount !== revisionEntry.chunkCount) {
+            throw new Error(`Staged chunk count mismatch for ${sourceDetails.sourceId}`);
+        }
+
+        if (previousPendingRevisionId) {
+            prunedRevisionIds.push(previousPendingRevisionId);
+        }
+
+        await ingestionManifestCollection.updateOne(
+            { _id: sourceDetails.sourceId },
+            {
+                $set: {
+                    source: sourceDetails.source,
+                    sourceId: sourceDetails.sourceId,
+                    category: sourceDetails.category,
+                    latestSourceRevision: sourceRevision,
+                    updateAvailable: true,
+                    revisions: retainedRevisions,
+                    lastUpdatedAt: createdAt,
+                },
+            },
+            { session }
+        );
+
+        return { prunedRevisionIds: [...new Set(prunedRevisionIds)] };
     });
 };
 
@@ -301,7 +460,12 @@ const removePrunedSourceRevisions = async ({ sourceDetails, prunedRevisionIds })
     });
 };
 
-const processSource = async (filePath) => {
+const processSource = async (
+    filePath,
+    { activateAfterIngestion } = {}
+) => {
+    const { embeddingConfig } = getRuntimeSettings();
+    const embeddingConfigHash = createEmbeddingConfigHash(embeddingConfig);
     const sourceDetails = await loadSourceChunks(filePath);
     const manifest = await ingestionManifestCollection.findOne({
         _id: sourceDetails.sourceId,
@@ -313,8 +477,43 @@ const processSource = async (filePath) => {
     const newChunkKeys = sourceDetails.chunks.map((chunk) => chunk.metadata.chunkKey);
     const existingChunks = addChunkKeys(existingDocuments);
     const existingChunkKeys = existingChunks.map((document) => document.metadata.chunkKey);
+    const existingEmbeddingConfigHash = manifest?.embeddingConfigHash
+        ?? LEGACY_OPENAI_EMBEDDING_CONFIG_HASH;
+    const canReuseEmbeddings = existingEmbeddingConfigHash
+        === embeddingConfigHash;
+    const latestSourceRevision = manifest?.latestSourceRevision
+        ?? manifest?.activeSourceRevision;
 
-    if (manifest && arraysMatch(newChunkKeys, existingChunkKeys)) {
+    if (
+        manifest?.activeSourceRevision
+        && latestSourceRevision !== manifest.activeSourceRevision
+    ) {
+        const latestRevision = normalizeManifestRevisions(manifest)
+            .find((revision) => revision.id === latestSourceRevision);
+        const latestDocuments = await documentsCollection.find({
+            "metadata.sourceId": sourceDetails.sourceId,
+            sourceRevision: latestSourceRevision,
+        }).sort({ "metadata.chunk": 1 }).toArray();
+        const latestChunkKeys = addChunkKeys(latestDocuments)
+            .map((document) => document.metadata.chunkKey);
+
+        if (
+            latestRevision?.embeddingConfigHash === embeddingConfigHash
+            && arraysMatch(newChunkKeys, latestChunkKeys)
+        ) {
+            return {
+                sourceId: sourceDetails.sourceId,
+                sourceRevision: latestSourceRevision,
+                status: "pending_activation",
+            };
+        }
+    }
+
+    if (
+        manifest
+        && canReuseEmbeddings
+        && arraysMatch(newChunkKeys, existingChunkKeys)
+    ) {
         return {
             sourceId: sourceDetails.sourceId,
             status: "unchanged",
@@ -324,14 +523,32 @@ const processSource = async (filePath) => {
     const createdAt = Date.now();
     const sourceRevision = createSourceRevisionId(sourceDetails.sourceId, createdAt);
     let activationResult;
+    const shouldActivate = !manifest?.activeSourceRevision
+        || activateAfterIngestion === true
+        || (activateAfterIngestion === undefined && !manifest?.updateAvailable);
 
     try {
-        await stageSourceRevision({ sourceDetails, existingDocuments, sourceRevision });
-        activationResult = await activateSourceRevision({
+        await stageSourceRevision({
             sourceDetails,
+            existingDocuments,
             sourceRevision,
-            createdAt,
+            canReuseEmbeddings,
+            embeddingConfig,
+            embeddingConfigHash,
         });
+        activationResult = shouldActivate
+            ? await activateSourceRevision({
+                sourceDetails,
+                sourceRevision,
+                createdAt,
+                embeddingConfigHash,
+            })
+            : await recordStagedSourceRevision({
+                sourceDetails,
+                sourceRevision,
+                createdAt,
+                embeddingConfigHash,
+            });
     } catch (error) {
         await documentsCollection.deleteMany({
             "metadata.sourceId": sourceDetails.sourceId,
@@ -353,16 +570,24 @@ const processSource = async (filePath) => {
     return {
         sourceId: sourceDetails.sourceId,
         sourceRevision,
-        status: "updated",
+        status: shouldActivate ? "updated" : "staged",
         chunkCount: sourceDetails.chunks.length,
     };
 };
+
+export const ingestSourceFile = async (filePath, options) => processSource(
+    filePath,
+    options
+);
 
 /**
  * Atomically switches a source to one of its retained revisions.
  */
 export const activateRetainedSourceRevision = async (sourceId, targetRevisionId) =>
     runInTransaction(async (session) => {
+        const activeEmbeddingConfigHash = createEmbeddingConfigHash(
+            getRuntimeSettings().embeddingConfig
+        );
         const manifest = await ingestionManifestCollection.findOne(
             { _id: sourceId },
             { session }
@@ -375,6 +600,12 @@ export const activateRetainedSourceRevision = async (sourceId, targetRevisionId)
 
         if (!targetRevision) {
             throw new Error(`Revision ${targetRevisionId} is not retained for ${sourceId}`);
+        }
+
+        if (targetRevision.embeddingConfigHash !== activeEmbeddingConfigHash) {
+            throw new Error(
+                `Revision ${targetRevisionId} uses a different embedding configuration`
+            );
         }
 
         const retainedChunkCount = await documentsCollection.countDocuments(
@@ -411,6 +642,8 @@ export const activateRetainedSourceRevision = async (sourceId, targetRevisionId)
         }
 
         const activatedAt = Date.now();
+        const latestSourceRevision = manifest.latestSourceRevision
+            ?? manifest.activeSourceRevision;
         const updatedRevisions = revisions.map((revision) => revision.id === targetRevisionId
             ? { ...revision, lastActivatedAt: activatedAt }
             : revision
@@ -421,9 +654,12 @@ export const activateRetainedSourceRevision = async (sourceId, targetRevisionId)
             {
                 $set: {
                     activeSourceRevision: targetRevisionId,
+                    latestSourceRevision,
+                    updateAvailable: targetRevisionId !== latestSourceRevision,
                     sourceHash: targetRevision.sourceHash,
                     chunkKeys: targetRevision.chunkKeys,
                     chunkCount: targetRevision.chunkCount,
+                    embeddingConfigHash: targetRevision.embeddingConfigHash,
                     revisions: updatedRevisions,
                     lastUpdatedAt: activatedAt,
                 },
@@ -436,6 +672,167 @@ export const activateRetainedSourceRevision = async (sourceId, targetRevisionId)
             activeSourceRevision: targetRevisionId,
         };
     });
+
+export const migrateEmbeddingConfiguration = async (nextSettings) => {
+    if (embeddingMigrationInProgress) {
+        throw new Error("An embedding configuration migration is already running");
+    }
+
+    embeddingMigrationInProgress = true;
+    const embeddingConfig = nextSettings.embeddingConfig;
+    const embeddingConfigHash = createEmbeddingConfigHash(embeddingConfig);
+    const preparedSources = [];
+
+    try {
+        const filePaths = getAllFiles(DATA_DIR);
+        if (!filePaths.length) {
+            throw new Error(`No ingestable documents found in ${DATA_DIR}`);
+        }
+
+        for (const filePath of filePaths) {
+            const sourceDetails = await loadSourceChunks(filePath);
+            const manifest = await ingestionManifestCollection.findOne({
+                _id: sourceDetails.sourceId,
+            });
+            const existingDocuments = await getExistingSourceDocuments({
+                ...sourceDetails,
+                manifest,
+            });
+            const existingEmbeddingConfigHash = manifest?.embeddingConfigHash
+                ?? LEGACY_OPENAI_EMBEDDING_CONFIG_HASH;
+            const sourceRevision = createSourceRevisionId(
+                sourceDetails.sourceId,
+                Date.now()
+            );
+            const preparedSource = {
+                sourceDetails,
+                sourceRevision,
+                createdAt: Date.now(),
+            };
+            preparedSources.push(preparedSource);
+
+            await stageSourceRevision({
+                sourceDetails,
+                existingDocuments,
+                sourceRevision,
+                canReuseEmbeddings: existingEmbeddingConfigHash === embeddingConfigHash,
+                embeddingConfig,
+                embeddingConfigHash,
+            });
+        }
+
+        const cleanupPlans = await runInTransaction(async (session) => {
+            const plans = [];
+
+            for (const preparedSource of preparedSources) {
+                const { sourceDetails, sourceRevision, createdAt } = preparedSource;
+                const currentManifest = await ingestionManifestCollection.findOne(
+                    { _id: sourceDetails.sourceId },
+                    { session }
+                );
+                const revisionEntry = createRevisionEntry({
+                    sourceDetails,
+                    sourceRevision,
+                    createdAt,
+                    activated: true,
+                    embeddingConfigHash,
+                });
+                const previousRevisions = normalizeManifestRevisions(currentManifest)
+                    .filter((revision) => revision.id !== sourceRevision);
+                const { retainedRevisions, prunedRevisionIds } = retainSourceRevisions({
+                    revisions: [revisionEntry, ...previousRevisions],
+                    activeRevisionId: sourceRevision,
+                    latestRevisionId: sourceRevision,
+                });
+
+                await documentsCollection.updateMany(
+                    {
+                        "metadata.sourceType": "vector",
+                        $or: [
+                            { "metadata.sourceId": sourceDetails.sourceId, active: true },
+                            {
+                                "metadata.source": sourceDetails.source,
+                                "metadata.category": sourceDetails.category,
+                                "metadata.sourceId": { $exists: false },
+                            },
+                        ],
+                    },
+                    { $set: { active: false } },
+                    { session }
+                );
+                const activationResult = await documentsCollection.updateMany(
+                    {
+                        "metadata.sourceId": sourceDetails.sourceId,
+                        sourceRevision,
+                    },
+                    { $set: { active: true } },
+                    { session }
+                );
+
+                if (activationResult.matchedCount !== revisionEntry.chunkCount) {
+                    throw new Error(
+                        `Prepared chunk count mismatch for ${sourceDetails.sourceId}`
+                    );
+                }
+
+                await ingestionManifestCollection.updateOne(
+                    { _id: sourceDetails.sourceId },
+                    {
+                        $set: {
+                            source: sourceDetails.source,
+                            sourceId: sourceDetails.sourceId,
+                            category: sourceDetails.category,
+                            activeSourceRevision: sourceRevision,
+                            latestSourceRevision: sourceRevision,
+                            updateAvailable: false,
+                            sourceHash: revisionEntry.sourceHash,
+                            chunkKeys: revisionEntry.chunkKeys,
+                            chunkCount: revisionEntry.chunkCount,
+                            embeddingConfigHash,
+                            revisions: retainedRevisions,
+                            lastUpdatedAt: createdAt,
+                        },
+                        $setOnInsert: { createdAt },
+                    },
+                    { upsert: true, session }
+                );
+                plans.push({ sourceDetails, prunedRevisionIds });
+            }
+
+            await persistRuntimeSettings(nextSettings, { session });
+            return plans;
+        });
+
+        setRuntimeSettings(nextSettings);
+
+        for (const cleanupPlan of cleanupPlans) {
+            try {
+                await removePrunedSourceRevisions(cleanupPlan);
+            } catch (error) {
+                logger.warn(
+                    `Pruned revision cleanup failed for ${cleanupPlan.sourceDetails.sourceId}:`,
+                    error
+                );
+            }
+        }
+
+        return {
+            embeddingConfigHash,
+            migratedSourceCount: preparedSources.length,
+        };
+    } catch (error) {
+        await Promise.allSettled(preparedSources.map(({ sourceDetails, sourceRevision }) =>
+            documentsCollection.deleteMany({
+                "metadata.sourceId": sourceDetails.sourceId,
+                sourceRevision,
+                active: false,
+            })
+        ));
+        throw error;
+    } finally {
+        embeddingMigrationInProgress = false;
+    }
+};
 
 const removeDeletedSources = async (discoveredSourceIds) => {
     const manifests = await ingestionManifestCollection.find({}).toArray();
