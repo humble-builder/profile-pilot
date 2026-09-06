@@ -6,6 +6,8 @@ import { PanelRightClose } from "lucide-react";
 }
 
 export default function SourcePanel({ sources, onClose }: Props) {
+  const visibleSources = sources.slice(0, 3);
+
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -25,46 +27,21 @@ export default function SourcePanel({ sources, onClose }: Props) {
         </p>
       ) : (
           <ul className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {sources.map((source) => (
+              {visibleSources.map((source) => (
                 <li key={source.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     {source.type === "vector" ? (
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="truncate text-sm font-medium text-gray-900">
-                            {source.source}
-                          </div>
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                            vector
-                          </span>
-                        </div>
-                        <ul className="mt-2 space-y-1">
-                          {source.chunks.map((chunk) => (
-                          <li key={`${source.id}-${chunk.number}`} className="flex justify-between text-xs text-gray-600">
-                            <span>Chunk {chunk.number}</span>
-                            <span>{chunk.score.toFixed(3)}</span>
-                          </li>
-                          ))}
-                        </ul>
+                      <div className="truncate text-sm font-medium text-gray-900">
+                        {source.source}
                       </div>
                     ) : (
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                          <a
-                            href={source.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="truncate text-sm font-medium text-gray-900 underline"
-                          >
-                            {source.title}
-                          </a>
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">
-                            web
-                          </span>
-                      </div>
-                        <div className="mt-2 text-xs text-gray-500">
-                          {source.tags.filter(Boolean).join(" · ")}
-                        </div>
-                    </div>
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-sm font-medium text-gray-900 underline"
+                      >
+                        {source.title}
+                      </a>
                     )}
                 </li>
               ))}
