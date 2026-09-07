@@ -1,3 +1,10 @@
+/**
+ * Runtime-settings workflow:
+ * 1. Reject the update while a source operation is active.
+ * 2. Normalize the submitted values against the current settings.
+ * 3. Re-embed and atomically switch every source when the embedding shape changes.
+ * 4. Otherwise persist the lightweight settings update and refresh the in-memory copy.
+ */
 import { createEmbeddingConfigHash } from "../config/env.js";
 import {
     getRuntimeSettings,
@@ -12,10 +19,12 @@ import {
     tryStartSettingsUpdate,
 } from "../services/adminOperationGuard.js";
 
+/** Return the settings currently used by chat and retrieval services. */
 export const readRuntimeSettings = (_req, res) => {
     return res.json(serializeRuntimeSettings());
 };
 
+/** Validate and apply a runtime-settings update submitted by an administrator. */
 export const updateRuntimeSettings = async (req, res) => {
     if (!tryStartSettingsUpdate()) {
         return res.status(409).json({

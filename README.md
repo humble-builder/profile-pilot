@@ -26,12 +26,17 @@ Implemented:
 * Source expansion for list-style questions
 * Tavily web search for current general knowledge and grounded market-aware evaluation
 * OpenAI LLM response generation
+* Runtime chat and embedding settings persisted in MongoDB
+* Versioned document ingestion with staged revisions and atomic activation
+* Authenticated admin APIs for settings, uploads, and revision management
+* Docker Compose deployment and release-image publishing workflow
+* Targeted unit and MongoDB integration tests for the new ingestion/settings flow
 
 Still in progress:
 
-* Automated tests
+* Browser-level end-to-end and accessibility coverage
 * More robust intent keyword coverage
-* Production deployment setup
+* End-user installer packaging and first-run secret/configuration setup
 * Broader error handling and observability
 
 ---
@@ -69,7 +74,7 @@ backend/
   src/
     app.js                   Express app startup, DB connection, ingestion
     config/                  Environment, DB, and memory helpers
-    controllers/             Chat request handlers
+    controllers/             Chat, runtime-settings, and source-admin handlers
     data/                    Local file discovery and document loading
     database/                MongoDB chat history reads/writes
     entity/                  Deterministic entity detection
@@ -78,6 +83,7 @@ backend/
     services/                RAG orchestration, LLM, and web search
     strategy/                Retrieval policy selection and result evaluation
     utils/                   Prompt/context builders, logging, hashing, progress cursor
+  test/                      Unit and MongoDB integration tests
 
 documents/
   capabilities/              Skills, projects, experience
@@ -90,6 +96,10 @@ frontend/
   src/components/            Chat UI, auth controls, source panel
   src/services/              Backend API client
   src/types/                 Chat and source types
+
+scripts/                     Docker lifecycle scripts for Windows and Unix-like systems
+compose.yaml                 Hardened official-image topology
+compose.dev.yaml             Contributor source-build override
 ```
 
 ---
@@ -163,13 +173,39 @@ GET /chat/history?userId=recruiter@example.com
 DELETE /chat/:sessionId/:conversationId?userId=recruiter@example.com
 ```
 
+### Admin Settings
+
+```http
+GET /service/admin/settings
+PUT /service/admin/settings
+```
+
+The update body may include `chatModel`, `embeddingModel`,
+`embeddingDimensions`, `embeddingBatchSize`, and `embeddingTimeoutMs`.
+Changing the embedding model or dimensions triggers an all-source migration;
+the active settings and document revisions switch together only after every
+replacement revision is ready.
+
+### Admin Sources
+
+```http
+GET  /service/admin/sources
+POST /service/admin/sources/upload?category=profile&filename=profile.pdf&activateAfterIngestion=false
+POST /service/admin/sources/activate
+```
+
+Upload requests contain the raw PDF, DOCX, or TXT body and are limited to 10 MB.
+Activation requests contain `sourceId` and `revisionId`. All `/service/admin/*`
+endpoints require the configured token in the `x-admin-token` header; the
+frontend server routes add this token so it is never exposed to the browser.
+
 ---
 
 ## Local Setup
 
-### Official installer prerequisites
+### Official container prerequisites
 
-The release installer runs the complete local stack from approved, digest-pinned
+The official container configuration runs the complete local stack from approved, digest-pinned
 container images. It does not build the frontend or backend on the user's
 machine. MongoDB and the backend are not published directly to the host; the
 frontend proxies `/backend/*` requests to the internal backend service.
@@ -186,10 +222,12 @@ Before installation, the user needs:
 * Profile documents in PDF, DOCX, or TXT format
 * An available local frontend port (port `3000` by default)
 
-The installer supplies the approved image digests, generates the local auth and
-backend admin tokens, writes the local `.env`, and places selected documents in the mounted
-`documents/` directory. OpenAI and OAuth secrets are passed at runtime and are
-never baked into either application image.
+This repository currently provides Docker lifecycle scripts, not a first-run
+secrets/bootstrap installer. Before the first official start, copy `.env.example`
+to `.env`, replace every placeholder (including the release image digests), and
+place the selected profile documents under `documents/ingestables/`. OpenAI and
+OAuth secrets are passed at runtime and are never baked into either application
+image.
 
 After installation, the application is controlled with:
 
@@ -208,9 +246,9 @@ ingestion, so unchanged document chunks reuse their existing embeddings.
 Non-secret chat and embedding settings are managed through the authenticated
 settings API and persist in MongoDB without editing `.env`.
 
-The reusable, authenticated Profile Settings panel supports runtime model
-settings and PDF, DOCX, and TXT uploads up to 10 MB. It remains separate from
-the recruiter-facing chat. Chat-model, embedding batch-size, and timeout changes
+The reusable, authenticated `ProfileSettings` component supports runtime model
+settings and PDF, DOCX, and TXT uploads up to 10 MB. It is intentionally not
+mounted into the recruiter-facing chat UI yet. Chat-model, embedding batch-size, and timeout changes
 apply without re-ingestion. Embedding model or dimension changes prepare all
 replacement revisions first, then atomically switch the active configuration and
 documents. The configured admin may activate a successful document ingestion
@@ -234,8 +272,8 @@ Official images are published only when a GitHub Release is published. The
 release workflow uses commit-pinned build actions, publishes to the
 `humble-builder` GitHub Container Registry namespace, attaches SBOM and maximum
 provenance metadata, creates GitHub artifact attestations, and reports the exact
-image digests required by installer packaging. The installer must copy those
-digests into its generated configuration; mutable image tags are rejected.
+image digests required by installer packaging. A future installer or release
+bundle must copy those digests into its generated configuration; mutable image tags are rejected.
 Repository settings should protect the `official-release` environment with a
 required maintainer approval.
 
@@ -259,6 +297,8 @@ Fill in the API and OAuth values in `.env` before starting. The placeholder
 official image digests are ignored by the development override.
 
 ### Manual development setup
+
+Manual development requires Node.js 24 or newer.
 
 Install backend dependencies:
 
@@ -311,12 +351,49 @@ npm run dev
 
 ---
 
+## Automated Tests
+
+The backend uses Node's built-in test runner. From `backend/`, run the unit,
+service, and controller suite plus any integration tests for which dependencies
+are configured:
+
+```bash
+npm test
+```
+
+The ingestion integration suite requires a reachable MongoDB replica set because
+the production workflow uses transactions:
+
+```bash
+TEST_MONGO_URI="mongodb://127.0.0.1:27017/profile_pilot_test?replicaSet=rs0" npm run test:integration
+```
+
+Integration tests use deterministic injected embeddings and mock external API
+clients; they do not call OpenAI or Tavily. Current backend coverage includes
+intent/entity routing, retrieval strategy, prompt/context generation, LLM/web/vector
+service orchestration, controller validation, admin authentication, runtime settings,
+document upload and activation, chat history, revision staging, embedding migration,
+and rollback.
+
+The frontend uses Vitest, jsdom, and Testing Library for API clients, authenticated
+server proxy routes, settings submission/partial-failure behavior, revision activation,
+and the recruiter-facing chat components:
+
+```bash
+cd frontend
+npm test
+```
+
+Browser-level end-to-end tests and accessibility audits remain future work.
+
+---
+
 ## Development Notes
 
 * The backend currently ingests documents during server startup.
 * The vector store is implemented in MongoDB, not ChromaDB or Pinecone.
 * External-person resumes are not fetched from the web; unsupported external-profile requests use a safe response until a separately grounded collection is implemented.
-* `npm test` is not wired yet and currently exits with the default "no test specified" message.
+* `npm test` runs the backend unit suite; MongoDB integration tests require `TEST_MONGO_URI`.
 * The document set is intentionally organized by recruiter question type so metadata-aware retrieval can route questions more reliably.
 * Intent keyword tuning is part of the development loop. If a recruiter phrase routes to `general`, update the dictionary with the phrasing that caused the miss.
 

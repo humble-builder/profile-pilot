@@ -1,3 +1,13 @@
+/**
+ * Document-ingestion workflow:
+ * 1. Load and split a source into stable, occurrence-aware chunks.
+ * 2. Reuse compatible embeddings and stage the remaining chunks as an inactive revision.
+ * 3. Transactionally update the manifest and active revision pointers.
+ * 4. Prune old inactive revisions only after the transaction commits.
+ *
+ * Startup ingestion tolerates failures for sources that already have an active fallback. Initial
+ * source failures still abort startup so the service never appears healthy without usable data.
+ */
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { v4 as uuidv4 } from "uuid";
@@ -112,7 +122,8 @@ const embedWithOpenAI = async (texts, embeddingConfig) => {
 
 const embedMissingChunks = async (
     chunks,
-    embeddingConfig
+    embeddingConfig,
+    embedDocuments = embedWithOpenAI
 ) => {
     if (!chunks.length) return [];
 
@@ -121,7 +132,7 @@ const embedMissingChunks = async (
         embeddingConfig.batchSize
     );
     const embeddedBatches = await Promise.all(
-        chunkBatches.map((batch) => embedWithOpenAI(batch, embeddingConfig))
+        chunkBatches.map((batch) => embedDocuments(batch, embeddingConfig))
     );
     const embeddingsArray = embeddedBatches.flat();
 
@@ -139,6 +150,7 @@ const stageSourceRevision = async ({
     canReuseEmbeddings,
     embeddingConfig,
     embeddingConfigHash,
+    embedDocuments,
 }) => {
     const existingChunks = addChunkKeys(existingDocuments);
     const existingByChunkKey = new Map(existingChunks.map((document) => [
@@ -151,7 +163,8 @@ const stageSourceRevision = async ({
     );
     const generatedEmbeddings = await embedMissingChunks(
         chunksNeedingEmbeddings,
-        embeddingConfig
+        embeddingConfig,
+        embedDocuments
     );
     const generatedEmbeddingByChunkKey = new Map(chunksNeedingEmbeddings.map((chunk, index) => [
         chunk.metadata.chunkKey,
@@ -462,7 +475,7 @@ const removePrunedSourceRevisions = async ({ sourceDetails, prunedRevisionIds })
 
 const processSource = async (
     filePath,
-    { activateAfterIngestion } = {}
+    { activateAfterIngestion, embedDocuments } = {}
 ) => {
     const { embeddingConfig } = getRuntimeSettings();
     const embeddingConfigHash = createEmbeddingConfigHash(embeddingConfig);
@@ -535,6 +548,7 @@ const processSource = async (
             canReuseEmbeddings,
             embeddingConfig,
             embeddingConfigHash,
+            embedDocuments,
         });
         activationResult = shouldActivate
             ? await activateSourceRevision({
@@ -575,14 +589,13 @@ const processSource = async (
     };
 };
 
+/** Stage or activate one source file and report duplicate states without throwing. */
 export const ingestSourceFile = async (filePath, options) => processSource(
     filePath,
     options
 );
 
-/**
- * Atomically switches a source to one of its retained revisions.
- */
+/** Atomically switch a source to a complete retained revision with compatible embeddings. */
 export const activateRetainedSourceRevision = async (sourceId, targetRevisionId) =>
     runInTransaction(async (session) => {
         const activeEmbeddingConfigHash = createEmbeddingConfigHash(
@@ -673,7 +686,14 @@ export const activateRetainedSourceRevision = async (sourceId, targetRevisionId)
         };
     });
 
-export const migrateEmbeddingConfiguration = async (nextSettings) => {
+/**
+ * Prepare embeddings for every local source, then switch documents and settings in one
+ * transaction. Prepared inactive documents are removed if any source fails before commit.
+ */
+export const migrateEmbeddingConfiguration = async (
+    nextSettings,
+    { embedDocuments } = {}
+) => {
     if (embeddingMigrationInProgress) {
         throw new Error("An embedding configuration migration is already running");
     }
@@ -718,6 +738,7 @@ export const migrateEmbeddingConfiguration = async (nextSettings) => {
                 canReuseEmbeddings: existingEmbeddingConfigHash === embeddingConfigHash,
                 embeddingConfig,
                 embeddingConfigHash,
+                embedDocuments,
             });
         }
 
@@ -861,9 +882,7 @@ const removeDeletedSources = async (discoveredSourceIds) => {
     if (failedDeletion) throw failedDeletion.reason;
 };
 
-/**
- * Incrementally ingests local profile documents one source at a time.
- */
+/** Reconcile all local files with MongoDB while preserving existing-source fallbacks. */
 export const ingestDocuments = async () => {
     const cursorInterval = startCursor("Ingesting documents...");
 

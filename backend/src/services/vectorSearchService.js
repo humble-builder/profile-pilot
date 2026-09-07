@@ -1,3 +1,9 @@
+/**
+ * Answer-generation workflow:
+ * load recent history and route intent -> run eligible retrieval providers in parallel ->
+ * choose/fuse context -> build the prompt -> call the LLM -> normalize cited sources.
+ * Retrieval failures degrade to the remaining provider instead of failing the whole chat request.
+ */
 import { getConversation } from "../config/memory.js";
 import { searchSimilarDocs } from "../retrieval/searchSimilarDocs.js";
 import { getLLMResponse } from "./llmService.js";
@@ -22,20 +28,21 @@ const unwrapRetrievalResult = (settledResult, source) => {
     return [];
 };
 
-/**
- * Service to perform RAG operations (search doc, retreive history, call LLM service)
- * @param {*} request Request body from the controller
- * @returns LLM response back to controller
- */
-
-export const getAnswer = async (query) => {
+/** Orchestrate retrieval-augmented generation for one normalized chat query. */
+export const getAnswer = async (query, {
+    loadConversation = getConversation,
+    routeRequest = routeIntent,
+    searchVector = searchSimilarDocs,
+    searchExternalWeb = searchWeb,
+    generateReply = getLLMResponse,
+} = {}) => {
     const { message } = query;
     const sources = [];
     const requestContext = { message };
 
     const [conversation, routedRequest] = await Promise.all([
-        getConversation(query),
-        routeIntent(message),
+        loadConversation(query),
+        routeRequest(message),
     ]);
 
     const history = conversation.length
@@ -60,10 +67,10 @@ export const getAnswer = async (query) => {
 
     const [vectorOutcome, webOutcome] = await Promise.allSettled([
         shouldRetrieveVector
-            ? searchSimilarDocs(requestContext)
+            ? searchVector(requestContext)
             : Promise.resolve([]),
         shouldRetrieveWeb
-            ? searchWeb(message)
+            ? searchExternalWeb(message)
             : Promise.resolve([]),
     ]);
 
@@ -107,7 +114,7 @@ export const getAnswer = async (query) => {
         },
     });
 
-    const reply = await getLLMResponse(prompt);
+    const reply = await generateReply(prompt);
 
     if (["vector", "hybrid"].includes(retrievalDecision.llmContextMode)) {
         sources.push(...retreivedDocs.map((doc) => ({

@@ -1,3 +1,9 @@
+/**
+ * Runtime-settings lifecycle:
+ * environment defaults -> MongoDB initialization -> validation/normalization -> in-memory reads.
+ * The in-memory copy keeps request paths synchronous; MongoDB remains the durable source across
+ * process restarts.
+ */
 import {
     applicationSettingsCollection,
 } from "./db.js";
@@ -30,6 +36,7 @@ const readModelName = (input, field, fallback) => {
     return input[field].trim();
 };
 
+/** Merge partial input with a base configuration and enforce supported value combinations. */
 export const normalizeRuntimeSettings = (input, base = activeSettings) => {
     const chatModel = readModelName(input, "chatModel", base.chatModel);
     const model = readModelName(input, "embeddingModel", base.embeddingConfig.model);
@@ -63,6 +70,7 @@ export const normalizeRuntimeSettings = (input, base = activeSettings) => {
     });
 };
 
+/** Flatten the internal settings shape for API and database boundaries. */
 export const serializeRuntimeSettings = (settings = activeSettings) => ({
     chatModel: settings.chatModel,
     embeddingModel: settings.embeddingConfig.model,
@@ -72,12 +80,15 @@ export const serializeRuntimeSettings = (settings = activeSettings) => ({
     embeddingConfigHash: createEmbeddingConfigHash(settings.embeddingConfig),
 });
 
+/** Return the immutable settings snapshot currently used by request handlers. */
 export const getRuntimeSettings = () => activeSettings;
 
+/** Replace the process-local settings snapshot after durable persistence succeeds. */
 export const setRuntimeSettings = (settings) => {
     activeSettings = settings;
 };
 
+/** Upsert normalized settings, optionally as part of a caller-owned MongoDB transaction. */
 export const persistRuntimeSettings = async (settings, { session } = {}) => {
     await applicationSettingsCollection.updateOne(
         { _id: SETTINGS_ID },
@@ -92,6 +103,7 @@ export const persistRuntimeSettings = async (settings, { session } = {}) => {
     );
 };
 
+/** Load persisted settings during startup, creating the defaults on the first run. */
 export const initializeRuntimeSettings = async () => {
     const storedSettings = await applicationSettingsCollection.findOne({ _id: SETTINGS_ID });
 

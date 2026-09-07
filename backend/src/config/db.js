@@ -34,3 +34,7 @@ export const connectDB = async () => {
     }
 
 };
+
+export const disconnectDB = async () => {
+    await client.close();
+};

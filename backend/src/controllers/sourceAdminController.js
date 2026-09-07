@@ -1,3 +1,10 @@
+/**
+ * Source-administration workflow:
+ * - List retained revisions from ingestion manifests.
+ * - Validate and write uploads inside DATA_DIR, then ask ingestion to stage or activate them.
+ * - Restore the previous file when ingestion fails or detects a duplicate.
+ * - Serialize uploads/activations against embedding-settings migrations.
+ */
 import fs from "fs/promises";
 import path from "path";
 import { ingestionManifestCollection } from "../config/db.js";
@@ -60,7 +67,8 @@ const restoreFile = async (filePath, previousContent) => {
     await fs.rm(filePath, { force: true });
 };
 
-const getDuplicateUploadConflict = (status) => {
+/** Convert ingestion duplicate states into stable HTTP conflict payloads. */
+export const getDuplicateUploadConflict = (status) => {
     if (status === "unchanged") {
         return {
             error: "This document is identical to the active revision",
@@ -78,6 +86,7 @@ const getDuplicateUploadConflict = (status) => {
     return null;
 };
 
+/** List each source and the active/latest revisions available to the admin UI. */
 export const listSources = async (_req, res) => {
     try {
         const manifests = await ingestionManifestCollection.find({}, {
@@ -113,6 +122,10 @@ export const listSources = async (_req, res) => {
     }
 };
 
+/**
+ * Persist and ingest one raw document upload.
+ * The filesystem write is rolled back unless ingestion produces a new revision.
+ */
 export const uploadSource = async (req, res) => {
     let targetPath;
     let previousContent;
@@ -183,6 +196,7 @@ export const uploadSource = async (req, res) => {
     }
 };
 
+/** Atomically make a retained, embedding-compatible source revision active. */
 export const activateSource = async (req, res) => {
     if (!tryStartSourceOperation()) {
         return res.status(409).json({
