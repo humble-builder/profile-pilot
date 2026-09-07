@@ -1,3 +1,8 @@
+/**
+ * Chat-controller workflow:
+ * validate request identity -> run the RAG service -> persist both messages -> return the reply.
+ * History reads and deletes use the same user/session/conversation hierarchy.
+ */
 import { getAnswer } from "../services/vectorSearchService.js";
 import { addMessage } from "../config/memory.js";
 import {
@@ -6,12 +11,7 @@ import {
 } from "../config/memory.js";
 import { v4 as uuidv4 } from "uuid";
 
-/**
- * Controls the chat between user and LLM
- * @param {*} req Request object received from source
- * @param {*} res Response object to be returned to source
- * @returns {JSON} Reply generated using conversation history and retrieved context
- */
+/** Validate a chat request, generate its answer, and persist the conversation turn. */
 export const createChat = async (req, res) => {
     try {
         const { userId, sessionId, sessionCreatedAt, message } = req.body;
@@ -57,6 +57,7 @@ export const createChat = async (req, res) => {
     }
 };
 
+/** Return all stored conversations for one user. */
 export const getChatHistory = async (req, res) => {
     try {
         const {userId} = req.query;
@@ -79,6 +80,7 @@ export const getChatHistory = async (req, res) => {
     }
 }
 
+/** Delete one conversation owned by the requested user and session. */
 export const deleteChat = async (req, res) => {
     try {
         const {userId} = req.query;

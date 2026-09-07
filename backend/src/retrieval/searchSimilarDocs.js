@@ -1,3 +1,8 @@
+/**
+ * Vector-retrieval workflow:
+ * embed with the active runtime configuration -> load only compatible active documents -> score
+ * and rerank -> expand or deduplicate results according to the detected query shape.
+ */
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { documentsCollection } from "../config/db.js";
 import { rerankDocuments } from "./rerankDocuments.js";
@@ -10,18 +15,18 @@ import {
 } from "../config/env.js";
 import { getRuntimeSettings } from "../config/runtimeSettings.js";
 
-/**
- * Searches for documents similar to the given query
- * @param {string} query The user's query string for which we want to find similar documents
- * @returns {Promise<Array>} Array of top relevant documents with their similarity scores
- */
-export const searchSimilarDocs = async (query) => {
+/** Return the document chunks most relevant to a routed query and its detected intent. */
+export const searchSimilarDocs = async (
+    query,
+    { embeddings: injectedEmbeddings, collection } = {}
+) => {
     const { embeddingConfig } = getRuntimeSettings();
     const embeddingConfigHash = createEmbeddingConfigHash(embeddingConfig);
-    const embeddings = new OpenAIEmbeddings({
+    const embeddings = injectedEmbeddings ?? new OpenAIEmbeddings({
         apiKey: process.env.OPENAI_API_KEY,
         ...embeddingConfig,
     });
+    const documentStore = collection ?? documentsCollection;
 
     const { message: userQuery, intent: userIntent } = query;
     const queryEmbedding = await embeddings.embedQuery(userQuery);
@@ -34,7 +39,7 @@ export const searchSimilarDocs = async (query) => {
             ],
         }
         : { "metadata.embeddingConfigHash": embeddingConfigHash };
-    const documents = await documentsCollection.find({
+    const documents = await documentStore.find({
         active: true,
         "metadata.sourceType": "vector",
         ...embeddingCompatibilityFilter,
