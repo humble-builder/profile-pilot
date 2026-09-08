@@ -30,13 +30,14 @@ Implemented:
 * Versioned document ingestion with staged revisions and atomic activation
 * Authenticated admin APIs for settings, uploads, and revision management
 * Docker Compose deployment and release-image publishing workflow
+* Local first-run installer with preflight checks and mandatory Google admin verification
 * Targeted unit and MongoDB integration tests for the new ingestion/settings flow
 
 Still in progress:
 
 * Browser-level end-to-end and accessibility coverage
 * More robust intent keyword coverage
-* End-user installer packaging and first-run secret/configuration setup
+* Packaging the source installer as self-contained GitHub Release executables
 * Broader error handling and observability
 
 ---
@@ -215,19 +216,37 @@ Before installation, the user needs:
 * Docker Desktop or Docker Engine with Docker Compose v2, running locally
 * Internet access to pull the official images and call the configured AI APIs
 * An OpenAI API key with access to the selected chat and embedding models
-* Google OAuth client ID and secret, with
-  `http://localhost:3000/api/auth/callback/google` configured as a redirect URI
-* The Google account email that should be allowed to manage profile sources
+* Google OAuth client ID and secret, with both installer and application callback
+  URIs configured: `http://127.0.0.1:48731/oauth/callback` and
+  `http://localhost:3000/api/auth/callback/google` (replace `3000` when using
+  another frontend port)
 * A Tavily API key only when optional web search is enabled
 * Profile documents in PDF, DOCX, or TXT format
 * An available local frontend port (port `3000` by default)
 
-This repository currently provides Docker lifecycle scripts, not a first-run
-secrets/bootstrap installer. Before the first official start, copy `.env.example`
-to `.env`, replace every placeholder (including the release image digests), and
-place the selected profile documents under `documents/ingestables/`. OpenAI and
-OAuth secrets are passed at runtime and are never baked into either application
-image.
+The first-run installer validates Docker and the OpenAI key, then requires a real
+Google sign-in before installation can begin. The verified Google email becomes
+the sole administrator; the form never accepts a typed admin email. After the
+identity is displayed, the user must explicitly confirm it before the installer
+writes configuration or starts containers. Cancelled, denied, expired, or failed
+verification therefore leaves no partial installation. Existing `.env` or
+ProfilePilot data also blocks fresh setup, preventing an accidental second-admin
+registration.
+
+The installer source lives under `installer/`. Until self-contained release
+executables are published, running it from the repository requires Node.js 24:
+
+```powershell
+.\scripts\setup.ps1
+```
+
+Official mode reads digest-pinned image references from
+`installer/release-manifest.json`, which release packaging must generate. For a
+contributor build from the current source, use `.\scripts\setup.ps1 -Dev`.
+Secrets remain in memory through verification and are written only to the ignored
+root `.env` after Compose reports a healthy installation; they are never baked
+into either application image. Place profile documents under
+`documents/ingestables/` before or after setup.
 
 After installation, the application is controlled with:
 
@@ -272,8 +291,8 @@ Official images are published only when a GitHub Release is published. The
 release workflow uses commit-pinned build actions, publishes to the
 `humble-builder` GitHub Container Registry namespace, attaches SBOM and maximum
 provenance metadata, creates GitHub artifact attestations, and reports the exact
-image digests required by installer packaging. A future installer or release
-bundle must copy those digests into its generated configuration; mutable image tags are rejected.
+image digests required by installer packaging. Release packaging must place those
+digests in the installer's manifest; mutable image tags are rejected.
 Repository settings should protect the `official-release` environment with a
 required maintainer approval.
 
