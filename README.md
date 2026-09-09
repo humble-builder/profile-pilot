@@ -33,6 +33,9 @@ Implemented:
 * Local first-run installer with preflight checks and mandatory Google admin verification
 * Targeted unit and MongoDB integration tests for the new ingestion/settings flow
 
+Official V1 releases keep web search disabled. The retrieval implementation remains
+in the codebase for the planned quota-controlled gateway, but V1 makes no Tavily API calls.
+
 Still in progress:
 
 * Browser-level end-to-end and accessibility coverage
@@ -220,7 +223,6 @@ Before installation, the user needs:
   URIs configured: `http://127.0.0.1:48731/oauth/callback` and
   `http://localhost:3000/api/auth/callback/google` (replace `3000` when using
   another frontend port)
-* A Tavily API key only when optional web search is enabled
 * Profile documents in PDF, DOCX, or TXT format
 * An available local frontend port (port `3000` by default)
 

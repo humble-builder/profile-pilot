@@ -8,9 +8,17 @@ import { routeTavilyConfig } from '../strategy/routeTavilyQuery.js';
 import { hashContent } from '../utils/hashContent.js'; 
 import { logger } from '../utils/logger.js';
 
-const client = tavily({
-    apiKey: process.env.TAVILY_API_KEY,
-});
+let client;
+
+export const isWebSearchEnabled = () => (
+    process.env.WEB_SEARCH_ENABLED?.trim().toLowerCase() === "true"
+    && Boolean(process.env.TAVILY_API_KEY?.trim())
+);
+
+const getClient = () => {
+    client ??= tavily({ apiKey: process.env.TAVILY_API_KEY });
+    return client;
+};
 
 /**
  * Search the web using the Tavily API with the given query and return normalized results
@@ -20,12 +28,15 @@ const client = tavily({
 
 export const searchWeb = async (
     query,
-    { search = client.search.bind(client) } = {}
+    { enabled = isWebSearchEnabled(), search } = {}
 ) => {
+    if (!enabled) return [];
+
     try {
         console.log("Calling Tavily Web Search API...");
         const config = routeTavilyConfig(query);
-        const searchResults = await search(query, config);
+        const executeSearch = search ?? getClient().search.bind(getClient());
+        const searchResults = await executeSearch(query, config);
         return normalizeWebResults(searchResults, config.topic);
 
     } catch (error) {

@@ -7,12 +7,16 @@
 import { getConversation } from "../config/memory.js";
 import { searchSimilarDocs } from "../retrieval/searchSimilarDocs.js";
 import { getLLMResponse } from "./llmService.js";
-import { searchWeb } from "./webSearchService.js";
+import { isWebSearchEnabled, searchWeb } from "./webSearchService.js";
 import { fuseSearchResults } from "../retrieval/fuseSearchResults.js";
 import { logger } from "../utils/logger.js";
 import { buildPrompt } from "../utils/buildPrompt.js";
 import { v4 as uuidv4 } from "uuid";
-import { CAREER_PROMPT, EVALUATION_PROMPT } from "../../constants/prompts.js";
+import {
+    CAREER_PROMPT,
+    EVALUATION_PROMPT,
+    SAFE_FALLBACK_REPLY,
+} from "../../constants/prompts.js";
 import { routeIntent } from "../strategy/routeIntent.js";
 import {
     evaluateRetrievalStrategy,
@@ -34,6 +38,7 @@ export const getAnswer = async (query, {
     routeRequest = routeIntent,
     searchVector = searchSimilarDocs,
     searchExternalWeb = searchWeb,
+    webSearchAvailable = isWebSearchEnabled(),
     generateReply = getLLMResponse,
 } = {}) => {
     const { message } = query;
@@ -69,7 +74,7 @@ export const getAnswer = async (query, {
         shouldRetrieveVector
             ? searchVector(requestContext)
             : Promise.resolve([]),
-        shouldRetrieveWeb
+        shouldRetrieveWeb && webSearchAvailable
             ? searchExternalWeb(message)
             : Promise.resolve([]),
     ]);
@@ -79,6 +84,7 @@ export const getAnswer = async (query, {
     const retrievalDecision = evaluateRetrievalStrategy(executionPlan, {
         vectorResults: retreivedDocs,
         webResults: webSearchResults,
+        webSearchAvailable,
     });
 
     logger.info("DEBUG_ROUTING", JSON.stringify({
@@ -88,6 +94,13 @@ export const getAnswer = async (query, {
         llmContextMode: retrievalDecision.llmContextMode,
         reason: retrievalDecision.reason,
     }));
+
+    if (
+        retrievalDecision.llmContextMode === "none"
+        && retrievalDecision.responseStrategy === "safe_response"
+    ) {
+        return { reply: SAFE_FALLBACK_REPLY, sources: [] };
+    }
 
     let llmContextResults = [];
 

@@ -9,6 +9,7 @@ const { searchSimilarDocs } = await import("../src/retrieval/searchSimilarDocs.j
 const { getLLMResponse } = await import("../src/services/llmService.js");
 const { getAnswer } = await import("../src/services/vectorSearchService.js");
 const { normalizeWebResults, searchWeb } = await import("../src/services/webSearchService.js");
+const { SAFE_FALLBACK_REPLY } = await import("../constants/prompts.js");
 
 const vectorRoute = {
     strategy: "vector",
@@ -17,6 +18,14 @@ const vectorRoute = {
     fallbackStrategy: "safe_response",
     confidenceThresholds: { vector: 0.5, web: 0.7 },
     reason: "test vector route",
+};
+const hybridRoute = {
+    strategy: "hybrid",
+    vectorPolicy: "required",
+    webPolicy: "required",
+    fallbackStrategy: "safe_response",
+    confidenceThresholds: { vector: 0.5, web: 0.7 },
+    reason: "test hybrid route",
 };
 const intentResult = {
     predictedIntent: "skills",
@@ -50,6 +59,7 @@ test("LLM service uses the active runtime model and joins mock stream chunks", a
 test("web service passes routed configuration to a mock API and normalizes results", async () => {
     let receivedRequest;
     const results = await searchWeb("latest backend news", {
+        enabled: true,
         search: async (query, config) => {
             receivedRequest = { query, config };
             return { results: [{ title: "Result", content: "Current fact", score: 0.9, url: "https://example.com" }] };
@@ -65,8 +75,23 @@ test("web service passes routed configuration to a mock API and normalizes resul
 
 test("web service degrades mock provider failures to no results", async () => {
     assert.deepEqual(await searchWeb("latest news", {
+        enabled: true,
         search: async () => { throw new Error("mock provider unavailable"); },
     }), []);
+});
+
+test("web service makes no provider call when web search is disabled", async () => {
+    let called = false;
+    const results = await searchWeb("latest news", {
+        enabled: false,
+        search: async () => {
+            called = true;
+            return { results: [] };
+        },
+    });
+
+    assert.deepEqual(results, []);
+    assert.equal(called, false);
 });
 
 test("vector search embeds with a mock client and filters incompatible documents", async () => {
@@ -131,18 +156,56 @@ test("RAG orchestration uses mock services and groups vector citations", async (
 });
 
 test("RAG orchestration falls back safely when a required mock provider fails", async () => {
-    let generatedPrompt;
     const response = await getAnswer({ message: "skills" }, {
         loadConversation: async () => [],
         routeRequest: async () => ({ intentResult, vectorRoute }),
         searchVector: async () => { throw new Error("mock vector failure"); },
+        generateReply: async () => { throw new Error("LLM should not run"); },
+    });
+
+    assert.equal(response.reply, SAFE_FALLBACK_REPLY);
+    assert.deepEqual(response.sources, []);
+});
+
+test("disabled web search degrades a hybrid route to strong vector context", async () => {
+    let generatedPrompt;
+    const response = await getAnswer({ message: "latest profile fit" }, {
+        loadConversation: async () => [],
+        routeRequest: async () => ({ intentResult, vectorRoute: hybridRoute }),
+        searchVector: async () => [{
+            content: "verified profile fit",
+            score: 0.8,
+            metadata: {
+                hash: "profile-fit",
+                sourceType: "vector",
+                source: "role_fit.txt",
+                category: "capabilities",
+                chunk: 1,
+            },
+        }],
+        searchExternalWeb: async () => { throw new Error("web should not run"); },
+        webSearchAvailable: false,
         generateReply: async (prompt) => {
             generatedPrompt = prompt;
-            return "Safe fallback";
+            return "Grounded profile answer";
         },
     });
 
-    assert.equal(response.reply, "Safe fallback");
+    assert.equal(response.reply, "Grounded profile answer");
+    assert.equal(response.sources.length, 1);
+    assert.match(generatedPrompt[0].content, /verified profile fit/);
+});
+
+test("disabled web search uses neutral fallback when hybrid vector confidence is weak", async () => {
+    const response = await getAnswer({ message: "latest profile fit" }, {
+        loadConversation: async () => [],
+        routeRequest: async () => ({ intentResult, vectorRoute: hybridRoute }),
+        searchVector: async () => [{ content: "weak match", score: 0.49, metadata: {} }],
+        searchExternalWeb: async () => { throw new Error("web should not run"); },
+        webSearchAvailable: false,
+        generateReply: async () => { throw new Error("LLM should not run"); },
+    });
+
+    assert.equal(response.reply, SAFE_FALLBACK_REPLY);
     assert.deepEqual(response.sources, []);
-    assert.equal(generatedPrompt.at(-1).content, "skills");
 });

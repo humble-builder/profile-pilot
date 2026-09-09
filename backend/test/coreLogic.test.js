@@ -112,6 +112,20 @@ test("retrieval evaluation requires every required provider to meet confidence",
         vectorResults: [{ score: 0.8 }],
         webResults: [{ score: 0.6 }],
     }).llmContextMode, "none");
+
+    const webDisabled = evaluateRetrievalStrategy(plan, {
+        vectorResults: [{ score: 0.8 }],
+        webResults: [],
+        webSearchAvailable: false,
+    });
+    assert.equal(webDisabled.llmContextMode, "vector");
+    assert.equal(webDisabled.signals.webSearchSkipped, true);
+
+    assert.equal(evaluateRetrievalStrategy(plan, {
+        vectorResults: [{ score: 0.49 }],
+        webResults: [],
+        webSearchAvailable: false,
+    }).llmContextMode, "none");
 });
 
 test("context and prompt builders preserve source labels and history order", () => {
