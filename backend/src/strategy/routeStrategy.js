@@ -29,7 +29,7 @@ const hasConfidentResult = (results, threshold) => results.some((result) =>
 
 export const evaluateRetrievalStrategy = (
     executionPlan,
-    { vectorResults = [], webResults = [] } = {},
+    { vectorResults = [], webResults = [], webSearchAvailable = true } = {},
 ) => {
     const {
         shouldRetrieveVector,
@@ -38,15 +38,17 @@ export const evaluateRetrievalStrategy = (
         shouldClarify,
     } = executionPlan.signals;
 
-    const hasUsableVectorResults = shouldRetrieveVector
+    const requiresVector = shouldRetrieveVector;
+    const requiresWeb = shouldRetrieveWeb && webSearchAvailable;
+    const hasUsableVectorResults = requiresVector
         && hasConfidentResult(vectorResults, executionPlan.confidenceThresholds.vector);
-    const hasUsableWebResults = shouldRetrieveWeb
+    const hasUsableWebResults = requiresWeb
         && hasConfidentResult(webResults, executionPlan.confidenceThresholds.web);
 
-    const requiresRetrieval = shouldRetrieveVector || shouldRetrieveWeb;
-    const isVectorPolicySatisfied = !shouldRetrieveVector
+    const requiresRetrieval = requiresVector || requiresWeb;
+    const isVectorPolicySatisfied = !requiresVector
         || hasUsableVectorResults;
-    const isWebPolicySatisfied = !shouldRetrieveWeb
+    const isWebPolicySatisfied = !requiresWeb
         || hasUsableWebResults;
     const retrievalRequirementsMet = requiresRetrieval
         && isVectorPolicySatisfied
@@ -56,13 +58,13 @@ export const evaluateRetrievalStrategy = (
     let responseStrategy = executionPlan.fallbackStrategy;
 
     if (retrievalRequirementsMet && !shouldRespondDirectly && !shouldClarify) {
-        if (shouldRetrieveVector && shouldRetrieveWeb) {
+        if (requiresVector && requiresWeb) {
             llmContextMode = "hybrid";
         }
-        else if (shouldRetrieveVector) {
+        else if (requiresVector) {
             llmContextMode = "vector";
         }
-        else if (shouldRetrieveWeb) {
+        else if (requiresWeb) {
             llmContextMode = "web";
         }
 
@@ -75,6 +77,8 @@ export const evaluateRetrievalStrategy = (
         signals: {
             hasUsableVectorResults,
             hasUsableWebResults,
+            webSearchAvailable,
+            webSearchSkipped: shouldRetrieveWeb && !webSearchAvailable,
             isVectorPolicySatisfied,
             isWebPolicySatisfied,
             retrievalRequirementsMet,

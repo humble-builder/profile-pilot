@@ -51,6 +51,7 @@ describe("ProfileSettings", () => {
 
   it("loads settings and saves only changed model values", async () => {
     render(<ProfileSettings onClose={vi.fn()} />);
+    expect(await screen.findByRole("checkbox", { name: "Web search" })).toBeDisabled();
     const chatModel = await screen.findByLabelText("Chat model");
     fireEvent.change(chatModel, { target: { value: "new-chat-model" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));

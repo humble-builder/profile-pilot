@@ -24,7 +24,6 @@ function formPage(error = "") {
     <p class="note">Nothing is installed until Google verifies the admin account and you confirm it.</p>
     <form method="post" action="/verify">
       <label for="openai">OpenAI API key</label><input id="openai" name="openaiApiKey" type="password" required autocomplete="off">
-      <label for="tavily">Tavily API key (optional)</label><input id="tavily" name="tavilyApiKey" type="password" autocomplete="off">
       <label for="google-id">Google OAuth client ID</label><input id="google-id" name="googleClientId" required autocomplete="off">
       <label for="google-secret">Google OAuth client secret</label><input id="google-secret" name="googleClientSecret" type="password" required autocomplete="off">
       <label for="port">Application port</label><input id="port" name="frontendPort" type="number" min="1024" max="65535" value="3000" required>

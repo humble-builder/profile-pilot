@@ -214,6 +214,22 @@ export default function ProfileSettings({ onClose }: { onClose: () => void }) {
             />
           </label>
 
+          <div className="rounded border border-gray-200 bg-gray-50 p-3">
+            <label className="flex items-center justify-between gap-3 text-sm font-medium text-gray-700">
+              Web search
+              <input
+                aria-describedby="web-search-status"
+                checked={false}
+                disabled
+                readOnly
+                type="checkbox"
+              />
+            </label>
+            <p className="mt-1 text-xs text-gray-500" id="web-search-status">
+              Web search is not available in this release.
+            </p>
+          </div>
+
           <hr className="border-gray-200" />
           <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Document revision

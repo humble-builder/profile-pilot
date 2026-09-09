@@ -10,6 +10,7 @@ export function buildEnvironment(config, verifiedEmail) {
   const lines = [
     ["OPENAI_API_KEY", config.openaiApiKey],
     ["TAVILY_API_KEY", config.tavilyApiKey],
+    ["WEB_SEARCH_ENABLED", "false"],
     ["PROFILEPILOT_BACKEND_IMAGE", config.images.backend],
     ["PROFILEPILOT_FRONTEND_IMAGE", config.images.frontend],
     ["PROFILEPILOT_MONGO_IMAGE", config.images.mongo],
