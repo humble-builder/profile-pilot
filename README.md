@@ -1,47 +1,38 @@
 # ProfilePilot
 
-ProfilePilot is a recruiter-facing career assistant for Vishal Singh. It uses Retrieval-Augmented Generation (RAG), conversation memory, source attribution, and optional web search to answer questions about Vishal's profile, skills, projects, experience, hiring preferences, contact details, and professional links.
+ProfilePilot is a full-stack, retrieval-augmented career assistant that answers recruiter questions using a verified professional profile. It combines a Next.js chat interface with an Express API, MongoDB-backed document and conversation storage, and OpenAI embeddings and chat completions.
 
-The project is built as a full-stack learning project with a Node.js/Express backend, MongoDB-backed vector and chat storage, OpenAI embeddings and chat completions, policy-based Tavily web search, and a Next.js frontend.
+This project explores practical RAG engineering: choosing retrieval strategies, grounding answers in source documents, managing document revisions safely, and measuring how requests move through the system.
 
----
+## Highlights
 
-## Current Status
+- **Grounded career Q&A:** answers questions about skills, projects, experience, education, and hiring preferences, with source citations.
+- **Intent-aware retrieval:** routes requests using intent, entity, and query-shape signals; reranks by semantic and metadata relevance; expands broad list questions.
+- **Safe response behavior:** clarifies unresolved references and avoids presenting unsupported external-person profile information as verified fact.
+- **Incremental document ingestion:** processes PDF, DOCX, and TXT files, reuses embeddings for unchanged chunks, and detects duplicate uploads.
+- **Versioned source management:** stage document revisions, review them, and activate revisions atomically. Embedding-model changes migrate documents before switching the active configuration.
+- **Request observability:** an admin-only dashboard shows request volume, success rate, average and p95 latency, strategies, source usage, and per-request stage timings. Observability records omit prompts, replies, and document text.
+- **Protected administration:** Google sign-in and owner authorization protect the settings interface; server-side routes keep the backend admin token out of the browser.
+- **Containerized development:** Docker Compose starts the frontend, backend, and MongoDB replica set from source.
 
-The project has moved from a generic insurance RAG assistant into a career assistant named ProfilePilot.
+The current V1 configuration disables Tavily web requests. Web-search routing remains in the codebase for future quota-controlled use.
 
-Implemented:
+## Project status
 
-* Next.js chat UI with authentication, chat history, and source panel
-* Express chat API
-* MongoDB document and session storage
-* Document ingestion from the local `documents/` folder
-* OpenAI embedding generation
-* Cosine-similarity vector retrieval
-* Intent detection and intent-aware reranking
-* Dictionary-based entity detection for the profile owner, pronouns, and unresolved person references
-* Policy-based vector, web, hybrid, direct, clarification, and safe-response strategies
-* Metadata-aware document boosting
-* Query-shape handling for list/detail/default fact-style retrieval
-* Source expansion for list-style questions
-* Tavily web search for current general knowledge and grounded market-aware evaluation
-* OpenAI LLM response generation
-* Runtime chat and embedding settings persisted in MongoDB
-* Versioned document ingestion with staged revisions and atomic activation
-* Authenticated admin APIs for settings, uploads, and revision management
-* Docker Compose development and deployment configuration
-* Release-image publishing workflow
-* Targeted unit and MongoDB integration tests for the new ingestion/settings flow
+The current application uses a single shared profile and document collection. User-owned profiles and per-user document isolation are future work; do not treat the current version as a multi-tenant application.
 
-Official V1 releases keep web search disabled. The retrieval implementation remains
-in the codebase for the planned quota-controlled gateway, but V1 makes no Tavily API calls.
+The settings and source-management component is implemented but is not mounted in the recruiter-facing chat screen. An owner can use its protected admin routes and the observability dashboard.
 
-Still in progress:
+## Technology
 
-* Browser-level end-to-end and accessibility coverage
-* More robust intent keyword coverage
-* Broader error handling and observability
-* User-owned profile and document isolation
+| Area | Tools |
+|---|---|
+| Frontend | Next.js, React, TypeScript, Tailwind CSS, NextAuth |
+| Backend | Node.js, Express |
+| Storage | MongoDB for conversations, vectors, source manifests, settings, and observability events |
+| AI | OpenAI embeddings and chat completions |
+| Documents | PDF, DOCX, and TXT ingestion |
+| Operations | Docker Compose, Node test runner, Vitest |
 
 ---
 
@@ -54,7 +45,7 @@ Frontend chat UI
   -> intent detection + entity detection
   -> retrieval strategy selection
   -> optional vector retrieval and reranking
-  -> optional Tavily web search for current information
+  -> policy-gated external search (disabled in V1)
   -> retrieval-confidence evaluation
   -> prompt construction
   -> OpenAI response
@@ -63,6 +54,8 @@ Frontend chat UI
 ```
 
 The backend ingests local documents at startup, chunks them, creates embeddings, and stores vector records in MongoDB. Chat messages and assistant responses are also persisted in MongoDB so the frontend can show session and conversation history.
+
+Chat requests also create metadata-only observability events. The owner dashboard reads these through an admin-protected API; request records contain timing, routing, status, and counts, but not prompt, reply, or document content.
 
 ---
 
@@ -201,6 +194,14 @@ Activation requests contain `sourceId` and `revisionId`. All `/service/admin/*`
 endpoints require the configured token in the `x-admin-token` header; the
 frontend server routes add this token so it is never exposed to the browser.
 
+### Observability
+
+```http
+GET /service/admin/observability?from=<ISO date>&to=<ISO date>&limit=100
+```
+
+The endpoint defaults to the previous 24 hours and the latest 100 request records (maximum 500). It returns summary metrics and recent request metadata. The dashboard is available at `/observability` to the configured admin account.
+
 ---
 
 ## Local Setup
@@ -221,7 +222,7 @@ token. The Google OAuth application needs this local callback URI:
 http://localhost:3000/api/auth/callback/google
 ```
 
-Official V1 releases disable web search, so no Tavily credential is required.
+The current V1 configuration disables web search, so no Tavily credential is required.
 Place profile documents under `documents/ingestables/`, then build and start the stack:
 
 ```powershell
@@ -354,6 +355,8 @@ Browser-level end-to-end tests and accessibility audits remain future work.
 * `npm test` runs the backend unit suite; MongoDB integration tests require `TEST_MONGO_URI`.
 * The document set is intentionally organized by recruiter question type so metadata-aware retrieval can route questions more reliably.
 * Intent keyword tuning is part of the development loop. If a recruiter phrase routes to `general`, update the dictionary with the phrasing that caused the miss.
+
+The observability dashboard is available to the configured admin at `/observability`. Request records are operational metadata and do not contain prompts, generated replies, or source text.
 
 ---
 
