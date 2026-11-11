@@ -1,4 +1,4 @@
-name: Publish official container images
+name: Publish container images
 
 on:
   release:
@@ -14,7 +14,6 @@ jobs:
   publish:
     name: Publish ${{ matrix.service }} image
     runs-on: ubuntu-latest
-    environment: official-release
     strategy:
       fail-fast: true
       matrix:
@@ -63,6 +62,3 @@ jobs:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
-
-      - name: Record installer image pin
-        run: echo '${{ matrix.service }}=${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}' >> "$GITHUB_STEP_SUMMARY"

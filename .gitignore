@@ -4,7 +4,6 @@ node_modules/
 # env
 .env
 .env.local
-.env.installing
 
 # builds
 dist/
@@ -35,9 +34,6 @@ chroma/
 # temp/uploads
 temp/
 uploads/
-
-# installer release artifacts
-installer/dist/
 
 # cache
 .cache/

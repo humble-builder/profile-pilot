@@ -8,7 +8,7 @@ x-default-logging: &default-logging
 
 services:
   mongo:
-    image: ${PROFILEPILOT_MONGO_IMAGE:-mongo:7.0}
+    image: mongo:7.0
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     restart: unless-stopped
     security_opt:
@@ -26,7 +26,7 @@ services:
       start_period: 10s
 
   mongo-init:
-    image: ${PROFILEPILOT_MONGO_IMAGE:-mongo:7.0}
+    image: mongo:7.0
     restart: "no"
     security_opt:
       - no-new-privileges:true
@@ -51,7 +51,9 @@ services:
     logging: *default-logging
 
   backend:
-    image: ${PROFILEPILOT_BACKEND_IMAGE:-ghcr.io/humble-builder/profile-pilot-backend:unreleased}
+    image: profilepilot-backend:local
+    build:
+      context: ./backend
     restart: unless-stopped
     init: true
     read_only: true
@@ -100,7 +102,12 @@ services:
       start_period: 20s
 
   frontend:
-    image: ${PROFILEPILOT_FRONTEND_IMAGE:-ghcr.io/humble-builder/profile-pilot-frontend:unreleased}
+    image: profilepilot-frontend:local
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: /backend
+        INTERNAL_API_URL: http://backend:5000
     restart: unless-stopped
     init: true
     read_only: true
