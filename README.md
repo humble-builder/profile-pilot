@@ -29,8 +29,8 @@ Implemented:
 * Runtime chat and embedding settings persisted in MongoDB
 * Versioned document ingestion with staged revisions and atomic activation
 * Authenticated admin APIs for settings, uploads, and revision management
-* Docker Compose deployment and release-image publishing workflow
-* Local first-run installer with preflight checks and mandatory Google admin verification
+* Docker Compose development and deployment configuration
+* Release-image publishing workflow
 * Targeted unit and MongoDB integration tests for the new ingestion/settings flow
 
 Official V1 releases keep web search disabled. The retrieval implementation remains
@@ -40,8 +40,8 @@ Still in progress:
 
 * Browser-level end-to-end and accessibility coverage
 * More robust intent keyword coverage
-* Packaging the source installer as self-contained GitHub Release executables
 * Broader error handling and observability
+* User-owned profile and document isolation
 
 ---
 
@@ -101,9 +101,7 @@ frontend/
   src/services/              Backend API client
   src/types/                 Chat and source types
 
-scripts/                     Docker lifecycle scripts for Windows and Unix-like systems
-compose.yaml                 Hardened official-image topology
-compose.dev.yaml             Contributor source-build override
+compose.yaml                 Local source-build topology
 ```
 
 ---
@@ -207,63 +205,35 @@ frontend server routes add this token so it is never exposed to the browser.
 
 ## Local Setup
 
-### Official container prerequisites
+### Docker Compose setup
 
-The official container configuration runs the complete local stack from approved, digest-pinned
-container images. It does not build the frontend or backend on the user's
-machine. MongoDB and the backend are not published directly to the host; the
-frontend proxies `/backend/*` requests to the internal backend service.
+The Compose configuration builds the frontend and backend from the checked-out
+source and starts them with a local MongoDB replica set. MongoDB and the backend
+remain on internal networks; the frontend proxies `/backend/*` requests to the
+backend service.
 
-Before installation, the user needs:
+Before starting the stack, install Docker Desktop or Docker Engine with Docker
+Compose v2. Copy `.env.example` to `.env` and configure the OpenAI credentials,
+Google OAuth application credentials, owner email, and server-to-server admin
+token. The Google OAuth application needs this local callback URI:
 
-* Docker Desktop or Docker Engine with Docker Compose v2, running locally
-* Internet access to pull the official images and call the configured AI APIs
-* An OpenAI API key with access to the selected chat and embedding models
-* Google OAuth client ID and secret, with both installer and application callback
-  URIs configured: `http://127.0.0.1:48731/oauth/callback` and
-  `http://localhost:3000/api/auth/callback/google` (replace `3000` when using
-  another frontend port)
-* Profile documents in PDF, DOCX, or TXT format
-* An available local frontend port (port `3000` by default)
-
-The first-run installer validates Docker and the OpenAI key, then requires a real
-Google sign-in before installation can begin. The verified Google email becomes
-the sole administrator; the form never accepts a typed admin email. After the
-identity is displayed, the user must explicitly confirm it before the installer
-writes configuration or starts containers. Cancelled, denied, expired, or failed
-verification therefore leaves no partial installation. Existing `.env` or
-ProfilePilot data also blocks fresh setup, preventing an accidental second-admin
-registration.
-
-The installer source lives under `installer/`. Until self-contained release
-executables are published, running it from the repository requires Node.js 24:
-
-```powershell
-.\scripts\setup.ps1
+```text
+http://localhost:3000/api/auth/callback/google
 ```
 
-Official mode reads digest-pinned image references from
-`installer/release-manifest.json`, which release packaging must generate. For a
-contributor build from the current source, use `.\scripts\setup.ps1 -Dev`.
-Secrets remain in memory through verification and are written only to the ignored
-root `.env` after Compose reports a healthy installation; they are never baked
-into either application image. Place profile documents under
-`documents/ingestables/` before or after setup.
-
-After installation, the application is controlled with:
+Official V1 releases disable web search, so no Tavily credential is required.
+Place profile documents under `documents/ingestables/`, then build and start the stack:
 
 ```powershell
-.\scripts\profilepilot.ps1 start
+Copy-Item .env.example .env
+docker compose up -d --build
 ```
 
-After changing environment-managed secrets, recreate the application services:
+Backend startup runs incremental ingestion, so unchanged document chunks reuse
+their existing embeddings. MongoDB data persists in its named volume across
+container restarts. To stop the stack without deleting that volume, run
+`docker compose down`.
 
-```powershell
-.\scripts\profilepilot.ps1 restart
-```
-
-The restart preserves the MongoDB volume. Backend startup runs incremental
-ingestion, so unchanged document chunks reuse their existing embeddings.
 Non-secret chat and embedding settings are managed through the authenticated
 settings API and persist in MongoDB without editing `.env`.
 
@@ -279,43 +249,10 @@ without failing normal startup ingestion. Staged state survives restart: the UI 
 authenticated server route, and “Use latest revision” performs an atomic pointer
 switch in MongoDB.
 
-On macOS or Linux, use `./scripts/profilepilot.sh` with the same actions.
-
-Official startup rejects application or MongoDB images that are not pinned by
-SHA-256 digest or are outside the approved image repositories. Application
-containers run as non-root with a read-only root filesystem, Linux capabilities
-dropped, privilege escalation disabled, bounded process counts, and rotated
-local logs. Only the backend can write the ingestable-document mount; downloadable
-files remain read-only. MongoDB data remains in its private named volume and
-internal network.
-
-Official images are published only when a GitHub Release is published. The
-release workflow uses commit-pinned build actions, publishes to the
-`humble-builder` GitHub Container Registry namespace, attaches SBOM and maximum
-provenance metadata, creates GitHub artifact attestations, and reports the exact
-image digests required by installer packaging. Release packaging must place those
-digests in the installer's manifest; mutable image tags are rejected.
-Repository settings should protect the `official-release` environment with a
-required maintainer approval.
-
-This protects the official distribution path from unreviewed source changes. A
-machine administrator can still replace software on their own computer, and a
-public repository can still be forked; neither action changes an official image
-or the upstream repository.
-
-### Contributor Docker setup
-
-Contributors may build from source with the development override. These images
-are separate from installer images and cannot become an official release until
-their changes are reviewed, merged, and published through the release pipeline.
-
-```powershell
-Copy-Item .env.example .env
-docker compose -f compose.yaml -f compose.dev.yaml up -d --build
-```
-
-Fill in the API and OAuth values in `.env` before starting. The placeholder
-official image digests are ignored by the development override.
+Application containers run as non-root with read-only root filesystems, Linux
+capabilities dropped, privilege escalation disabled, bounded process counts,
+and rotated local logs. Only the backend can write to the ingestable-document
+mount; downloadable files remain read-only.
 
 ### Manual development setup
 
