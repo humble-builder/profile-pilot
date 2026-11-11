@@ -10,9 +10,13 @@ import {
     deleteConversation
 } from "../config/memory.js";
 import { v4 as uuidv4 } from "uuid";
+import { recordObservabilityEvent } from "../services/observabilityService.js";
 
 /** Validate a chat request, generate its answer, and persist the conversation turn. */
 export const createChat = async (req, res) => {
+    const requestId = uuidv4();
+    const requestStartedAt = performance.now();
+    let requestContext;
     try {
         const { userId, sessionId, sessionCreatedAt, message } = req.body;
         /**
@@ -38,18 +42,37 @@ export const createChat = async (req, res) => {
         let conversationId = req.body.conversationId || uuidv4();
 
         const query = { userId, sessionId, sessionCreatedAt, conversationId, message };
+        requestContext = { requestId, conversationId };
         const response = await getAnswer(query);
 
         await addMessage(query, "user", req.body.message);
         await addMessage(query, "assistant", response.reply, response.sources);
 
+        await recordObservabilityEvent({
+            ...requestContext,
+            status: "success",
+            durationMs: Math.round(performance.now() - requestStartedAt),
+            ...response.observability,
+        });
+
         return res.json({
             conversationId,
-            ...response
+            reply: response.reply,
+            sources: response.sources,
         });
     }
     catch (err) {
         console.error("Error while creating chat:", err);
+        if (requestContext) {
+            await recordObservabilityEvent({
+                ...requestContext,
+                status: "error",
+                durationMs: Math.round(performance.now() - requestStartedAt),
+                ...(err.observability ?? {}),
+                failureStage: err.observability?.failureStage ?? "chat_persistence",
+                errorType: err.name ?? "Error",
+            });
+        }
         res.status(err.status ?? 500).json({
             error: err.message,
             reply: "Something went wrong. Please try again later."

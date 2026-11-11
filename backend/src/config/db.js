@@ -6,6 +6,7 @@ export let documentsCollection;
 export let sessionsCollection;
 export let ingestionManifestCollection;
 export let applicationSettingsCollection;
+export let observabilityCollection;
 
 export const runInTransaction = async (operation) => {
     const session = client.startSession();
@@ -27,6 +28,7 @@ export const connectDB = async () => {
         sessionsCollection = db.collection("sessions");
         ingestionManifestCollection = db.collection("ingestion_manifest");
         applicationSettingsCollection = db.collection("application_settings");
+        observabilityCollection = db.collection("observability_events");
 
     } catch (err) {
         console.error("MongoDB connection failed", err);

@@ -10,12 +10,14 @@ import {
     readRuntimeSettings,
     updateRuntimeSettings,
 } from "../controllers/runtimeSettingsController.js";
+import { readObservabilityDashboard } from "../controllers/observabilityController.js";
 
 const router = express.Router();
 
 router.get("/files/:filename", getFile);
 router.get("/admin/sources", requireAdminToken, listSources);
 router.get("/admin/settings", requireAdminToken, readRuntimeSettings);
+router.get("/admin/observability", requireAdminToken, readObservabilityDashboard);
 router.put(
     "/admin/settings",
     requireAdminToken,
