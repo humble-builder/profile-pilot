@@ -42,6 +42,25 @@ export const getAnswer = async (query, {
     generateReply = getLLMResponse,
 } = {}) => {
     const { message } = query;
+    const startedAt = performance.now();
+    const stageDurationsMs = {};
+    let currentStage = "conversation_and_routing";
+    let stageStartedAt = startedAt;
+    const telemetry = {
+        intent: "unknown",
+        plannedStrategy: "unknown",
+        contextMode: "none",
+        retrievalSignals: {},
+        resultCounts: { vector: 0, web: 0 },
+        sourceCount: 0,
+    };
+    const finishStage = (nextStage) => {
+        stageDurationsMs[currentStage] = Math.round(performance.now() - stageStartedAt);
+        currentStage = nextStage;
+        stageStartedAt = performance.now();
+    };
+
+    try {
     const sources = [];
     const requestContext = { message };
 
@@ -56,6 +75,10 @@ export const getAnswer = async (query, {
             content: conversationMessage.content,
         })).slice(-6)
         : [];
+
+    telemetry.intent = routedRequest.intentResult.predictedIntent;
+    telemetry.plannedStrategy = routedRequest.vectorRoute.strategy;
+    finishStage("retrieval");
 
     requestContext.intent = routedRequest.intentResult;
     requestContext.isEvaluationQuery = routedRequest.intentResult.detectedIntents.shapeIntents
@@ -95,11 +118,23 @@ export const getAnswer = async (query, {
         reason: retrievalDecision.reason,
     }));
 
+    telemetry.contextMode = retrievalDecision.llmContextMode;
+    telemetry.retrievalSignals = retrievalDecision.signals;
+    telemetry.resultCounts = {
+        vector: retreivedDocs.length,
+        web: webSearchResults.length,
+    };
+
     if (
         retrievalDecision.llmContextMode === "none"
         && retrievalDecision.responseStrategy === "safe_response"
     ) {
-        return { reply: SAFE_FALLBACK_REPLY, sources: [] };
+        finishStage("complete");
+        return {
+            reply: SAFE_FALLBACK_REPLY,
+            sources: [],
+            observability: { ...telemetry, stageDurationsMs: { ...stageDurationsMs } },
+        };
     }
 
     let llmContextResults = [];
@@ -127,7 +162,9 @@ export const getAnswer = async (query, {
         },
     });
 
+    finishStage("llm");
     const reply = await generateReply(prompt);
+    finishStage("source_grouping");
 
     if (["vector", "hybrid"].includes(retrievalDecision.llmContextMode)) {
         sources.push(...retreivedDocs.map((doc) => ({
@@ -186,8 +223,21 @@ export const getAnswer = async (query, {
         }
     })
 
+    const groupedSources = [...groupSources.values()];
+    telemetry.sourceCount = groupedSources.length;
+    finishStage("complete");
     return {
         reply,
-        sources: [...groupSources.values()]
+        sources: groupedSources,
+        observability: { ...telemetry, stageDurationsMs: { ...stageDurationsMs } },
     };
+    } catch (error) {
+        stageDurationsMs[currentStage] = Math.round(performance.now() - stageStartedAt);
+        error.observability = {
+            ...telemetry,
+            failureStage: currentStage,
+            stageDurationsMs: { ...stageDurationsMs },
+        };
+        throw error;
+    }
 }

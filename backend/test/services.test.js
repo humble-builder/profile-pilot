@@ -9,6 +9,7 @@ const { searchSimilarDocs } = await import("../src/retrieval/searchSimilarDocs.j
 const { getLLMResponse } = await import("../src/services/llmService.js");
 const { getAnswer } = await import("../src/services/vectorSearchService.js");
 const { normalizeWebResults, searchWeb } = await import("../src/services/webSearchService.js");
+const { getObservabilityDashboard } = await import("../src/services/observabilityService.js");
 const { SAFE_FALLBACK_REPLY } = await import("../constants/prompts.js");
 
 const vectorRoute = {
@@ -208,4 +209,72 @@ test("disabled web search uses neutral fallback when hybrid vector confidence is
 
     assert.equal(response.reply, SAFE_FALLBACK_REPLY);
     assert.deepEqual(response.sources, []);
+});
+
+test("observability dashboard aggregates metrics and bounds request rows", async () => {
+    const end = new Date("2026-11-12T12:00:00.000Z");
+    let requestLimit;
+    const collection = {
+        aggregate: (pipeline) => ({
+            toArray: async () => {
+                const groupId = pipeline.find((stage) => stage.$group)?.$group._id;
+                if (groupId === null) {
+                    return [{
+                        totalRequests: 4,
+                        successfulRequests: 3,
+                        failedRequests: 1,
+                        averageDurationMs: 1500,
+                        durations: [500, 1000, 2000, 3000],
+                        requestsWithSources: 2,
+                    }];
+                }
+                return groupId === "$plannedStrategy"
+                    ? [{ _id: "vector", count: 3 }, { _id: "direct", count: 1 }]
+                    : [{ _id: "skills", count: 2 }, { _id: "general", count: 2 }];
+            },
+        }),
+        find: () => ({
+            sort: () => ({
+                limit: (value) => {
+                    requestLimit = value;
+                    return { toArray: async () => [{ requestId: "request-1" }] };
+                },
+            }),
+        }),
+    };
+
+    const dashboard = await getObservabilityDashboard({
+        to: end,
+        limit: 25,
+        collection,
+    });
+
+    assert.equal(requestLimit, 25);
+    assert.equal(dashboard.range.from.toISOString(), "2026-11-11T12:00:00.000Z");
+    assert.equal(dashboard.summary.successRate, 0.75);
+    assert.equal(dashboard.summary.averageDurationMs, 1500);
+    assert.equal(dashboard.summary.p95DurationMs, 3000);
+    assert.deepEqual(dashboard.summary.strategyCounts, { vector: 3, direct: 1 });
+    assert.deepEqual(dashboard.summary.intentCounts, { skills: 2, general: 2 });
+    assert.equal(dashboard.requests.length, 1);
+});
+
+test("observability dashboard rejects invalid ranges and limits", async () => {
+    const collection = { aggregate: () => { throw new Error("query should not run"); } };
+    await assert.rejects(
+        getObservabilityDashboard({ limit: 0, collection }),
+        /limit must be an integer between 1 and 500/
+    );
+    await assert.rejects(
+        getObservabilityDashboard({ from: "not-a-date", collection }),
+        /from must be a valid date/
+    );
+    await assert.rejects(
+        getObservabilityDashboard({
+            from: "2026-11-12T12:00:00Z",
+            to: "2026-11-11T12:00:00Z",
+            collection,
+        }),
+        /from must be earlier than to/
+    );
 });
